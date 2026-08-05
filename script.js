@@ -162,6 +162,25 @@ document.querySelectorAll(".skill-item").forEach((item) => {
   })
 })
 
+// Project cards: navigate to their case-study page on click
+document.querySelectorAll(".project-card[data-href]").forEach((card) => {
+  card.setAttribute("tabindex", "0")
+  card.setAttribute("role", "link")
+
+  card.addEventListener("click", (e) => {
+    if (e.target.closest(".project-links")) return
+    window.location.href = card.dataset.href
+  })
+
+  card.addEventListener("keydown", (e) => {
+    if (e.target.closest(".project-links")) return
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault()
+      window.location.href = card.dataset.href
+    }
+  })
+})
+
 // Project cards tilt effect
 document.querySelectorAll(".project-card").forEach((card) => {
   card.addEventListener("mousemove", function (e) {

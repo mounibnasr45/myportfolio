@@ -582,6 +582,15 @@ body {
   overflow: hidden;
 }
 
+.project-card[data-href] {
+  cursor: pointer;
+}
+
+.project-card[data-href]:focus-visible {
+  outline: 2px solid var(--primary-color);
+  outline-offset: 4px;
+}
+
 .project-card::before {
   content: "";
   position: absolute;
@@ -661,6 +670,70 @@ body {
   background: var(--primary-color);
   color: white;
   transform: translateY(-2px);
+}
+
+.project-credit {
+  color: var(--text-light);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+/* Education Section */
+.education {
+  padding: 6rem 0;
+  background: var(--bg-secondary);
+}
+
+.education-card {
+  max-width: 700px;
+  margin: 0 auto;
+  background: var(--bg-primary);
+  padding: 2.5rem;
+  border-radius: 1rem;
+  box-shadow: var(--shadow-md);
+  display: flex;
+  gap: 1.5rem;
+  align-items: flex-start;
+}
+
+.education-icon {
+  width: 60px;
+  height: 60px;
+  flex-shrink: 0;
+  background: var(--gradient-primary);
+  border-radius: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.5rem;
+  color: white;
+}
+
+.education-details h3 {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 0.5rem;
+  color: var(--text-primary);
+}
+
+.education-details .company {
+  color: var(--primary-color);
+  font-weight: 600;
+  display: block;
+  margin-bottom: 0.25rem;
+}
+
+.education-details .period {
+  color: var(--text-light);
+  font-size: 0.9rem;
+}
+
+@media (max-width: 480px) {
+  .education-card {
+    flex-direction: column;
+    text-align: center;
+    align-items: center;
+  }
 }
 
 /* Skills Section */

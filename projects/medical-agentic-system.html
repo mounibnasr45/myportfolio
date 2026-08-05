@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Medical Agentic System — Case Study | Mounib Nasr</title>
+    <meta name="description" content="A multi-agent clinical decision support system built with CrewAI, GraphRAG, Neo4j, and LangChain memory.">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../project.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="article-header">
+        <div class="container">
+            <a href="../index.html#projects" class="back-link"><i class="fas fa-arrow-left"></i> Back to portfolio</a>
+            <span class="logo-text">MN</span>
+        </div>
+    </header>
+
+    <section class="article-hero">
+        <div class="container">
+            <span class="eyebrow">Case Study</span>
+            <h1>Medical Agentic System</h1>
+            <p class="tagline">
+                An enterprise-grade AI medical assistant combining multi-agent orchestration, GraphRAG
+                (graph + vector retrieval), and conversational memory to deliver context-aware, evidence-grounded
+                clinical decision support — drug interactions, contraindications, and treatment guidance.
+            </p>
+            <div class="tech-badges">
+                <span class="tech-tag">CrewAI</span>
+                <span class="tech-tag">Neo4j + Graphiti</span>
+                <span class="tech-tag">FastAPI</span>
+                <span class="tech-tag">LangChain Memory</span>
+                <span class="tech-tag">Groq Llama 3.3</span>
+            </div>
+            <div class="cta-buttons">
+                <a href="https://github.com/mounibnasr45/medical_agentic_system" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
+    <article class="article-content">
+        <h2>Overview</h2>
+        <p>
+            The system routes each incoming question through an LLM-powered router that scores intent and
+            complexity, then dynamically allocates 1–3 specialized CrewAI agents — a clinical researcher, a safety
+            validator, and a clinical analyst — to answer it. Every session keeps conversational memory so follow-up
+            questions ("what are its interactions?") resolve against the drug named earlier in the conversation.
+        </p>
+
+        <h2>Architecture</h2>
+        <pre><code>FastAPI /ask (session_id, query)
+        │
+        ▼
+MemoryManager (LangChain)  — load session history, inject context
+        │
+        ▼
+Intelligent Router (Groq Llama-3.3-70B)
+  - classify intent, score complexity 1-5
+  - pick 1-3 agents, set iteration limits
+        │
+        ▼
+Medical Crew (CrewAI)
+  ┌─────────────────────────────┐
+  │ Clinical Researcher          │  Tools: Graph DB, Web Search, Cypher
+  │ Safety Validator (optional)  │  Cross-checks contraindications
+  │ Clinical Analyst (optional)  │  Synthesizes final recommendation
+  └─────────────────────────────┘
+        │
+        ▼
+Tools Layer → Neo4j + Graphiti (hybrid vector+graph) / DuckDuckGo / Cypher
+        │
+        ▼
+Response + memory update + cache write</code></pre>
+
+        <h3>Intelligent query router</h3>
+        <p>
+            A Groq Llama-3.3-70B call analyzes every query and returns a validated Pydantic
+            <code>QueryAnalysis</code> — intent, a 1–5 complexity score, which agents to spin up, per-agent
+            iteration budgets, and a rejection path for non-medical queries. Nothing downstream trusts free-text
+            classification; the router's output is a typed contract.
+        </p>
+        <pre><code>QueryAnalysis(
+    intent="drug_interaction",
+    complexity=3,
+    required_agents=["researcher", "validator", "analyst"],
+    max_iterations={"researcher": 4, "validator": 2, "analyst": 2},
+    suggested_tools=["graph_db", "web_search"],
+    is_medical=True,
+    confidence=0.95,
+    reasoning="Complex drug interaction requires multi-agent validation"
+)</code></pre>
+
+        <h3>GraphRAG knowledge system</h3>
+        <p>
+            Medical entities and relationships live in Neo4j; Graphiti layers hybrid vector + graph search on top,
+            using <code>all-MiniLM-L6-v2</code> embeddings for semantic matching alongside graph traversal. A
+            DuckDuckGo web-search tool is the fallback whenever the graph has no answer, and a direct Cypher-query
+            tool handles complex pattern matching the hybrid search doesn't cover.
+        </p>
+
+        <h3>Conversation memory</h3>
+        <p>
+            Each session gets an isolated LangChain <code>ConversationBufferMemory</code>, summarized automatically
+            once a conversation passes ten messages. Memory is in-process (no disk I/O), so context injection into a
+            follow-up query is effectively free.
+        </p>
+
+        <h2>Performance optimizations</h2>
+        <ul>
+            <li><strong>Multi-level caching</strong> — MD5-hashed response cache (1-hour TTL) plus a separate tool-level cache for graph DB and web-search results.</li>
+            <li><strong>Lazy loading</strong> — the Neo4j driver, the Graphiti client, and the embeddings model are all initialized on first use, not at startup.</li>
+            <li><strong>Streaming</strong> — Server-Sent Events expose the agents' live reasoning ("recherche en cours…") instead of a blank wait.</li>
+            <li><strong>Tool diversity enforcement</strong> — agents are prompted to switch tools between iterations rather than repeating a query that already returned nothing useful.</li>
+        </ul>
+
+        <h2>Processing mode selection</h2>
+        <p>
+            Two execution modes share the same router output: <strong>Crew mode</strong> (sequential, CrewAI
+            task delegation) for most queries, and <strong>MCP mode</strong> (parallel tool execution) auto-selected
+            when complexity ≥ 3, the intent is an interaction check, and multiple tools are needed at once — with a
+            manual <code>use_mcp</code> override available on the API.
+        </p>
+
+        <h2>Tech stack</h2>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr><td><strong>Core</strong></td><td>Python, FastAPI, CrewAI, LangChain, Neo4j + Graphiti</td></tr>
+                    <tr><td><strong>Query routing / agent LLM</strong></td><td>Groq Llama-3.3-70B</td></tr>
+                    <tr><td><strong>Embeddings</strong></td><td>all-MiniLM-L6-v2 (semantic vector search)</td></tr>
+                    <tr><td><strong>Web fallback</strong></td><td>DuckDuckGo Search API</td></tr>
+                    <tr><td><strong>Infra</strong></td><td>Uvicorn, Pydantic, Docker, structured Python logging</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Sample test cases</h2>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Query</th><th>Expected routing</th></tr></thead>
+                <tbody>
+                    <tr><td>"What is Aspirin?"</td><td>1 agent, 3 iterations</td></tr>
+                    <tr><td>"Can I take Aspirin with Warfarin?"</td><td>2 agents (researcher + validator), 4 iterations</td></tr>
+                    <tr><td>"All contraindications for bleeding disorders?"</td><td>3 agents, 5 iterations, all tools</td></tr>
+                    <tr><td>"What's the weather today?"</td><td>Instant rejection — non-medical</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cta-buttons" style="margin-top: 2rem;">
+            <a href="https://github.com/mounibnasr45/medical_agentic_system" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+        </div>
+    </article>
+
+    <footer class="article-footer">
+        <div class="container">
+            <p>&copy; 2026 Mounib Nasr. All rights reserved.</p>
+            <div class="footer-social">
+                <a href="mailto:mounibnasr123@gmail.com"><i class="fas fa-envelope"></i></a>
+                <a href="https://www.linkedin.com/in/mounib-nasr-073899244/" target="_blank"><i class="fab fa-linkedin"></i></a>
+                <a href="https://github.com/mounibnasr45" target="_blank"><i class="fab fa-github"></i></a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

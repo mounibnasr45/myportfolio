@@ -1,0 +1,197 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Agentic Deep Research System — Case Study | Mounib Nasr</title>
+    <meta name="description" content="An autonomous multi-agent research pipeline built with LangGraph, BeeAI, FastMCP, and the A2A protocol.">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../project.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="article-header">
+        <div class="container">
+            <a href="../index.html#projects" class="back-link"><i class="fas fa-arrow-left"></i> Back to portfolio</a>
+            <span class="logo-text">MN</span>
+        </div>
+    </header>
+
+    <section class="article-hero">
+        <div class="container">
+            <span class="eyebrow">Case Study</span>
+            <h1>Agentic Deep Research System</h1>
+            <p class="tagline">
+                An autonomous multi-agent research pipeline — drop in a topic, get back a structured Markdown
+                report. Four specialized agents collaborate over HTTP: a planner, an expert interviewer with live
+                web search, a report writer, and a governing orchestrator that enforces quality requirements before
+                each step completes.
+            </p>
+            <div class="tech-badges">
+                <span class="tech-tag">LangGraph</span>
+                <span class="tech-tag">BeeAI</span>
+                <span class="tech-tag">FastMCP</span>
+                <span class="tech-tag">A2A Protocol</span>
+                <span class="tech-tag">Groq Llama 3.3</span>
+            </div>
+            <div class="cta-buttons">
+                <a href="https://github.com/mounibnasr45/Agentic-Deep-Research-Mechanism" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
+    <article class="article-content">
+        <h2>What it does</h2>
+        <p>Given a research topic, the system:</p>
+        <ul>
+            <li><strong>Plans</strong> — generates a set of analyst personas (e.g. "Plasma Physicist at MIT", "Energy Policy Expert at Carnegie") tailored to the topic.</li>
+            <li><strong>Interviews</strong> — runs each analyst through a ReAct loop, calling live web search (Tavily) and Wikipedia via MCP tools.</li>
+            <li><strong>Writes</strong> — synthesizes all findings into a structured Markdown report with introduction, body, and conclusion.</li>
+            <li><strong>Governs</strong> — a BeeAI orchestrator enforces a 4-step checklist and retries any step that produces insufficient output.</li>
+        </ul>
+
+        <h2>Architecture</h2>
+        <p>
+            Each agent runs as an independent ASGI server discoverable via <code>/.well-known/agent.json</code> (the
+            A2A standard). The MCP tool server is spawned as a stdio subprocess by the interview agent — no extra
+            port required.
+        </p>
+        <pre><code>User / Notebook
+      │
+      ▼
+┌─────────────────────────────────────────────────────┐
+│  Orchestrator  (port 9995)                          │
+│  BeeAI RequirementAgent                             │
+│  ThinkTool · HandoffTool (×3)                       │
+└────────────┬────────────────────┬───────────────────┘
+             │  A2A Protocol      │  A2A Protocol
+             ▼                    ▼
+   ┌──────────────────┐  ┌────────────────────────┐
+   │ Planner          │  │ Interview              │
+   │ (port 9999)      │  │ (port 9998)            │
+   │ PlannerAgent     │  │ ExpertAgent            │
+   │ structured LLM   │  │ ReAct + MCP tools      │
+   │ → analyst list   │  │ → AnalystReport ×N     │
+   └──────────────────┘  └──────────┬─────────────┘
+                                    │ sections JSON
+                                    ▼
+                         ┌────────────────────────┐
+                         │ Writer  (port 9997)    │
+                         │ WriterAgent            │
+                         │ → Final Markdown       │
+                         └────────────────────────┘</code></pre>
+
+        <h3>How the orchestrator enforces quality</h3>
+        <p>
+            The BeeAI <code>RequirementAgent</code> runs a 4-step checklist on every iteration. A step only unlocks
+            after the previous one passes — this prevents partial outputs from silently propagating through the
+            pipeline.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Step</th><th>Condition checked</th><th>Action if not met</th></tr></thead>
+                <tbody>
+                    <tr><td>1</td><td>Analyst list exists</td><td>Think → call PlannerTool</td></tr>
+                    <tr><td>2</td><td>Interview sections exist</td><td>Think → call InterviewTool with analyst JSON</td></tr>
+                    <tr><td>3</td><td>Final report exists</td><td>Think → call WriterTool with sections JSON</td></tr>
+                    <tr><td>4</td><td>Report length &gt; 200 chars</td><td>Retry WriterTool</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Data flow between agents</h3>
+        <pre><code>Orchestrator → Planner   "Research topic: fusion energy"  (plain string)
+
+Planner → Orchestrator   {"analysts": [
+                            {"name": "Dr. Alice Chen", "role": "Plasma Physicist", ...},
+                            {"name": "Prof. Bob Smith", "role": "Energy Policy Expert", ...}
+                          ]}
+
+Orchestrator → Interview  {"topic": "fusion energy", "analysts": [...]}
+
+Interview → Orchestrator  {"sections": [
+                            {"analyst_name": "...", "key_findings": ["..."], "summary": "..."},
+                            ...
+                          ]}
+
+Orchestrator → Writer     {"topic": "fusion energy", "sections": [...]}
+
+Writer → Orchestrator     # Fusion Energy: Current State and Future Prospects
+                          ## Introduction
+                          ...  (full Markdown)</code></pre>
+
+        <h2>Tech stack</h2>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr><td><strong>LLM</strong></td><td>ChatGroq — llama-3.3-70b-versatile</td></tr>
+                    <tr><td><strong>Agent logic</strong></td><td>LangGraph <code>create_react_agent</code>, <code>StateGraph</code></td></tr>
+                    <tr><td><strong>Orchestration</strong></td><td>BeeAI <code>RequirementAgent</code>, <code>ConditionalRequirement</code>, <code>HandoffTool</code></td></tr>
+                    <tr><td><strong>Tool serving</strong></td><td>FastMCP (stdio transport)</td></tr>
+                    <tr><td><strong>Tool client</strong></td><td><code>langchain-mcp-adapters</code> — <code>MultiServerMCPClient</code> + <code>StdioConnection</code></td></tr>
+                    <tr><td><strong>Agent protocol</strong></td><td>A2A SDK — <code>AgentCard</code>, <code>AgentExecutor</code>, <code>A2AStarletteApplication</code></td></tr>
+                    <tr><td><strong>Web search</strong></td><td>Tavily API, Wikipedia via <code>langchain-community</code></td></tr>
+                    <tr><td><strong>Schema / validation</strong></td><td>Pydantic v2 — structured LLM outputs throughout</td></tr>
+                    <tr><td><strong>Server</strong></td><td>Uvicorn + Starlette</td></tr>
+                    <tr><td><strong>State persistence</strong></td><td>LangGraph <code>MemorySaver</code> (local mode)</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Design decisions worth noting</h2>
+        <h3>Why stdio MCP instead of HTTP MCP?</h3>
+        <p>
+            The expert agent spawns the MCP server as a subprocess via <code>MultiServerMCPClient</code> +
+            <code>StdioConnection</code>. This avoids managing an extra HTTP port and keeps the tool server tightly
+            scoped to the agent that needs it.
+        </p>
+        <h3>Why lazy async init on the expert agent?</h3>
+        <p>
+            MCP client initialization (<code>MultiServerMCPClient.__aenter__</code>) must happen inside an async
+            context. The <code>initialize()</code> pattern separates object construction (sync) from tool discovery
+            (async), making the agent safe to instantiate at import time.
+        </p>
+        <h3>Why structured Pydantic outputs everywhere?</h3>
+        <p>
+            Every LLM call uses <code>llm.with_structured_output(Model)</code>. This eliminates JSON parsing errors
+            at agent boundaries and gives full type safety across the pipeline — the orchestrator never receives a
+            malformed payload.
+        </p>
+        <h3>Why BeeAI for orchestration instead of another LangGraph graph?</h3>
+        <p>
+            BeeAI's <code>RequirementAgent</code> provides declarative quality gates
+            (<code>ConditionalRequirement</code>) without writing custom routing logic. The orchestrator's job is
+            governance, not research — keeping those concerns separate makes each layer easier to test and replace.
+        </p>
+
+        <h2>Local mode</h2>
+        <p>
+            The full pipeline also runs in a single process without spinning up four servers, which is the
+            recommended way to explore the system (used by the project's notebook):
+        </p>
+        <pre><code>from langchain_groq import ChatGroq
+from research_system import ResearchGraph
+
+llm = ChatGroq(model="llama-3.3-70b-versatile")
+graph = await ResearchGraph(llm).initialize()
+report = await graph.run("The future of fusion energy")
+print(report)</code></pre>
+
+        <div class="cta-buttons" style="margin-top: 2rem;">
+            <a href="https://github.com/mounibnasr45/Agentic-Deep-Research-Mechanism" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+        </div>
+    </article>
+
+    <footer class="article-footer">
+        <div class="container">
+            <p>&copy; 2026 Mounib Nasr. All rights reserved.</p>
+            <div class="footer-social">
+                <a href="mailto:mounibnasr123@gmail.com"><i class="fas fa-envelope"></i></a>
+                <a href="https://www.linkedin.com/in/mounib-nasr-073899244/" target="_blank"><i class="fab fa-linkedin"></i></a>
+                <a href="https://github.com/mounibnasr45" target="_blank"><i class="fab fa-github"></i></a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

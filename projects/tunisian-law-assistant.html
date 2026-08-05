@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tunisian Legal AI Assistant — Case Study | Mounib Nasr</title>
+    <meta name="description" content="A citation-grounded RAG legal assistant for Tunisian law, built on FastAPI, LangGraph, and PostgreSQL/pgvector.">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../project.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="article-header">
+        <div class="container">
+            <a href="../index.html#projects" class="back-link"><i class="fas fa-arrow-left"></i> Back to portfolio</a>
+            <span class="logo-text">MN</span>
+        </div>
+    </header>
+
+    <section class="article-hero">
+        <div class="container">
+            <span class="eyebrow">Case Study</span>
+            <h1>Agent Juridique Tunisien<br>Tunisian Legal AI Assistant</h1>
+            <p class="tagline">
+                A citation-grounded retrieval-augmented legal assistant for Tunisian law — the Constitution, the
+                Penal Code, and the decree-law on press freedom — that grounds every answer in specific, cited
+                articles rather than the model's own training data.
+            </p>
+            <div class="tech-badges">
+                <span class="tech-tag">FastAPI</span>
+                <span class="tech-tag">LangGraph</span>
+                <span class="tech-tag">PostgreSQL + pgvector</span>
+                <span class="tech-tag">Angular 22</span>
+                <span class="tech-tag">Hybrid RAG</span>
+            </div>
+            <div class="cta-buttons">
+                <a href="https://agentic-tn-law-2.onrender.com/" target="_blank" class="btn btn-primary"><i class="fas fa-globe"></i> Live Demo</a>
+                <a href="https://github.com/mounibnasr45/Agentic_Tn_law" target="_blank" class="btn btn-secondary"><i class="fab fa-github"></i> View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
+    <article class="article-content">
+        <h2>Overview</h2>
+        <p>
+            Agent Juridique Tunisien answers legal questions in French or English against three indexed source
+            texts, and grounds every answer in specific, cited articles rather than the model's own memory. It is
+            built as a small production service rather than a notebook: typed configuration, a migrated relational
+            schema, an authenticated multi-tenant API, a retrieval pipeline measured against a hand-built golden
+            set, and a CI pipeline that gates deploys on that measurement rather than on vibes.
+        </p>
+        <div class="callout">
+            <span class="callout-title">Design thesis</span>
+            <p>
+                An LLM-based legal assistant is worthless — or dangerous — the moment it cannot prove where an
+                answer came from, or fails silently instead of loudly. Every architectural boundary in this codebase
+                defends that thesis: a citation is a foreign-key row (<code>citations.chunk_id → chunks.id</code>),
+                not a string the model was asked nicely to produce.
+            </p>
+        </div>
+
+        <h2>System architecture</h2>
+        <p>
+            The default deployment is two Render web services — an nginx-served Angular bundle proxying
+            <code>/api</code> to a separate FastAPI container — which decouples the UI's release cycle from the
+            API's. The same API service can also serve the built SPA itself from one process, which is what powers
+            the single-container deployment used for the live demo above.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+graph TD
+    User([Browser]) --> UI["Angular 22 SPA"]
+    UI -->|"same-origin /api"| API["FastAPI · JWT auth"]
+
+    subgraph agent["Agent — LangGraph"]
+        API --> Graph["ReAct loop<br/>max 4 iterations"]
+        Graph -->|"tool call"| Tool["retrieval tool"]
+        Graph --> LLM["DeepSeek via OpenRouter"]
+        Graph <--> Memory[("checkpointer<br/>per user + thread")]
+        Graph --> Reflect["reflection checkpoint<br/>undefined-term check"]
+    end
+
+    subgraph retrieval["Hybrid retrieval — one SQL statement"]
+        Tool --> Dense["dense · pgvector<br/>cosine distance"]
+        Tool --> Lexical["lexical · Postgres FTS<br/>ts_rank_cd, french_unaccent"]
+        Dense --> Fusion["fuse<br/>weighted or RRF"]
+        Lexical --> Fusion
+    end
+
+    subgraph ingest["Ingestion"]
+        PDFs["Source PDFs"] --> Chunker["article-aware chunking"]
+        Chunker --> DB[("PostgreSQL + pgvector<br/>chunks, tsvector, embedding")]
+    end
+
+    DB -.-> Dense
+    DB -.-> Lexical
+    Fusion -->|"ranked chunks"| Graph
+    Graph -->|"answer + citations + trace"| API
+    API --> UI
+            </div>
+        </div>
+
+        <p>
+            The codebase is a textbook <strong>Ports &amp; Adapters (hexagonal) architecture</strong>, enforced by
+            import direction rather than convention alone — <code>app/domain/</code> physically cannot import
+            SQLAlchemy, LangChain, or FastAPI. That is what makes the domain layer testable with in-memory fakes,
+            and what lets an offline ablation harness sweep 11 retrieval configurations against a real corpus while
+            <code>tests/test_fusion.py</code> exercises the exact same math with zero I/O.
+        </p>
+
+        <h2>Retrieval-augmented generation</h2>
+        <h3>Article-aware chunking</h3>
+        <p>
+            Legal text is split on article boundaries, not by a fixed character count. A fixed-size splitter cuts
+            through the middle of articles, which makes a citation meaningless — "according to article 258" has to
+            point at the whole article, not a fragment of it.
+        </p>
+        <h3>Hybrid retrieval</h3>
+        <p>Every search runs two arms and fuses their results:</p>
+        <ul>
+            <li><strong>Dense</strong> — cosine distance between the query embedding and every chunk's stored embedding, via pgvector.</li>
+            <li><strong>Lexical</strong> — Postgres full-text search (<code>ts_rank_cd</code> against a <code>french_unaccent</code> configuration), not an in-memory index, so it survives a process restart.</li>
+        </ul>
+        <p>
+            The two candidate sets are combined either by weighted score or reciprocal rank fusion, selectable per
+            query. Measured against the golden set below, dense retrieval alone outperforms every hybrid weighting
+            on this corpus, so <code>HYBRID_WEIGHT_BM25=0.0</code> is the shipped default — the lexical arm stays
+            fully implemented and part of the ablation sweep, because that result is a property of this corpus, not
+            a law of retrieval.
+        </p>
+
+        <h2>Agent topology</h2>
+        <p>
+            The reasoning loop is a LangGraph <code>create_react_agent</code>: native tool-calling, not a
+            text-parsed ReAct template, so there is no output format for the model to imitate incorrectly. It has
+            exactly one tool, <code>rechercher_textes_juridiques</code>, and a hard cap of four iterations — a
+            runaway agent doing ten searches for one question is the single largest latency and cost sink an
+            unbounded loop can produce.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart TD
+    Q([Question]) --> Agent["LLM — native tool calling"]
+    Agent -->|"needs facts"| Retrieve["rechercher_textes_juridiques"]
+    Retrieve -->|"ranked chunks"| Agent
+    Agent -->|"has enough"| Draft["Draft answer"]
+    Agent -.->|"4th iteration reached"| Draft
+
+    Draft --> Reflect{"Reflection:<br/>any cited term<br/>left undefined?"}
+    Reflect -->|"no"| Final(["Final answer + citations"])
+    Reflect -->|"yes, up to 2 terms"| Lookup["search each term's definition"]
+    Lookup --> Rewrite["Finalize: fold definitions<br/>into the draft"]
+    Rewrite --> Final
+    Reflect -.->|"timeout or model error"| Final
+            </div>
+        </div>
+        <p>
+            The reflection checkpoint runs once, after the loop produces a draft, entirely outside the graph. It
+            asks a second, tool-less LLM call whether the draft leans on a legal term of art the retrieved articles
+            never defined — a term like <em>préméditation</em> can appear in one article while being defined in
+            another the first search never surfaced. Anything that fails (empty reply, timeout, malformed response)
+            fails open and returns the original draft untouched.
+        </p>
+
+        <h2>Tracing</h2>
+        <p>
+            Every retrieval call and every reflection pass is recorded into an <code>AgentTrace</code> — what was
+            searched, what came back and at what rank, whether a reflection pass found a gap. The trace is not a
+            debug log: it is returned to the client and rendered as the visible reasoning path in the Angular UI, so
+            a user can see which query the agent actually issued and which articles it read before answering.
+        </p>
+
+        <h2>Data model</h2>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+erDiagram
+    USERS ||--o{ REFRESH_TOKENS : issues
+    USERS ||--o{ CONVERSATIONS : owns
+    CONVERSATIONS ||--o{ MESSAGES : contains
+    MESSAGES ||--o{ CITATIONS : cites
+    DOCUMENTS ||--o{ CHUNKS : "split into"
+    CHUNKS ||--o{ CITATIONS : "referenced by"
+
+    USERS {
+        uuid id PK
+        string email
+        string password_hash
+        bool is_admin
+    }
+    DOCUMENTS {
+        uuid id PK
+        string title
+        string sha256
+        string status
+    }
+    CHUNKS {
+        bigint id PK
+        uuid document_id FK
+        string article_number
+        text content
+        vector embedding
+        tsvector tsv
+    }
+    CONVERSATIONS {
+        uuid id PK
+        uuid user_id FK
+        string thread_id
+        string title
+    }
+    MESSAGES {
+        bigint id PK
+        uuid conversation_id FK
+        string role
+        text content
+    }
+    CITATIONS {
+        bigint id PK
+        bigint message_id FK
+        bigint chunk_id FK
+        string article_number
+        float score
+    }
+            </div>
+        </div>
+        <p>
+            A citation row can only exist if <code>chunk_id</code> names a chunk the retrieval tool actually
+            returned — the foreign key makes a fabricated citation a schema violation, not a prompting hope.
+            Conversation state exists in two places on purpose: LangGraph's checkpointer owns an opaque,
+            versioned blob whose only job is resuming execution, while <code>conversations</code>/<code>messages</code>/<code>citations</code>
+            is a separate, queryable read model built for the product — coupling "list my chats" to a library's
+            internal serialization format is one LangGraph upgrade away from breaking.
+        </p>
+
+        <h2>Evaluation</h2>
+        <p>
+            Retrieval quality is measured, not assumed. A 56-question hand-written golden set, each mapped to the
+            one article that answers it, is swept across every retrieval configuration and gated in CI — a deploy
+            fails if any arm's hit@5 regresses by more than three points against a committed baseline.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr><th>Configuration</th><th>hit@1</th><th>hit@5</th><th>MRR</th></tr>
+                </thead>
+                <tbody>
+                    <tr><td>Dense only (shipped default)</td><td>0.875</td><td>0.982</td><td>0.917</td></tr>
+                    <tr><td>Best weighted hybrid</td><td>0.304</td><td>0.804</td><td>0.514</td></tr>
+                    <tr><td>Reciprocal rank fusion</td><td>0.429</td><td>0.804</td><td>0.583</td></tr>
+                    <tr><td>Lexical only</td><td>0.125</td><td>0.321</td><td>0.219</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Challenges &amp; solutions</h2>
+        <h3>A silent 12% of the corpus was never searchable</h3>
+        <p>
+            The original embedding model accepted 128 tokens while chunks were sized in characters — roughly
+            200–250 tokens for French legal prose — so it silently truncated over a third of penal-code chunks
+            before embedding them, with no error, only a library warning nobody was watching. It was found by
+            building the evaluation harness, not by any exception: hit@1 moved from 0.250 to 0.679 on the same
+            corpus, same questions, purely from switching to an encoder with a 512-token context. That is the
+            reason the evaluation harness exists as a permanent CI gate rather than a one-off script.
+        </p>
+        <h3>A free-tier host with less memory than the model needed</h3>
+        <p>
+            The service targets hosting with no ongoing cost, capping memory at 512MB. A local embedding encoder —
+            even after removing every non-essential dependency — still peaked at just over 500MB resident. The
+            embedding step moved out of the process entirely to an API call, which is also what motivated writing
+            the embeddings layer against a provider-agnostic <code>Embedder</code> protocol from the start: the
+            local encoder still exists and is a straight environment-variable switch away on a host with more
+            headroom.
+        </p>
+        <h3>Retrieval had to survive a cold process</h3>
+        <p>
+            An earlier design cached the lexical index in process memory; it worked in every manual test and
+            returned dense-only results with no warning after any restart, because the in-memory index was simply
+            gone. The fix — a generated <code>tsvector</code> column, indexed and queried in the same statement as
+            everything else — removed that entire class of bug structurally.
+        </p>
+
+        <h2>Tech stack</h2>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr><td><strong>Backend</strong></td><td>FastAPI, SQLAlchemy 2.0 (async), LangGraph, LangChain, Alembic</td></tr>
+                    <tr><td><strong>Frontend</strong></td><td>Angular 22, Angular Material 3, RxJS, Vitest</td></tr>
+                    <tr><td><strong>LLM</strong></td><td>DeepSeek, via OpenRouter</td></tr>
+                    <tr><td><strong>Embeddings</strong></td><td>Gemini API by default; local ONNX encoder (<code>multilingual-e5-small</code>) as a self-contained alternative</td></tr>
+                    <tr><td><strong>Storage &amp; search</strong></td><td>PostgreSQL + pgvector (dense arm), Postgres full-text search (lexical arm)</td></tr>
+                    <tr><td><strong>Auth</strong></td><td>argon2id password hashing, JWT access tokens, refresh-token rotation with replay detection</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cta-buttons" style="margin-top: 2rem;">
+            <a href="https://agentic-tn-law-2.onrender.com/" target="_blank" class="btn btn-primary"><i class="fas fa-globe"></i> Try the Live Demo</a>
+            <a href="https://github.com/mounibnasr45/Agentic_Tn_law" target="_blank" class="btn btn-secondary"><i class="fab fa-github"></i> View on GitHub</a>
+        </div>
+    </article>
+
+    <footer class="article-footer">
+        <div class="container">
+            <p>&copy; 2026 Mounib Nasr. All rights reserved.</p>
+            <div class="footer-social">
+                <a href="mailto:mounibnasr123@gmail.com"><i class="fas fa-envelope"></i></a>
+                <a href="https://www.linkedin.com/in/mounib-nasr-073899244/" target="_blank"><i class="fab fa-linkedin"></i></a>
+                <a href="https://github.com/mounibnasr45" target="_blank"><i class="fab fa-github"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+</body>
+</html>

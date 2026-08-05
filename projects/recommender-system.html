@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Movie Recommender System — Case Study | Mounib Nasr</title>
+    <meta name="description" content="A hybrid movie recommender combining matrix-factorization collaborative filtering with genre-based content scoring, plus semantic search.">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../project.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="article-header">
+        <div class="container">
+            <a href="../index.html#projects" class="back-link"><i class="fas fa-arrow-left"></i> Back to portfolio</a>
+            <span class="logo-text">MN</span>
+        </div>
+    </header>
+
+    <section class="article-hero">
+        <div class="container">
+            <span class="eyebrow">Case Study</span>
+            <h1>Movie Recommender System</h1>
+            <p class="tagline">
+                A hybrid MovieLens recommender — matrix-factorization collaborative filtering combined with
+                genre-based content scoring — plus a semantic search feature that finds movies from natural-language
+                descriptions using sentence-transformer embeddings.
+            </p>
+            <div class="tech-badges">
+                <span class="tech-tag">FastAPI</span>
+                <span class="tech-tag">Matrix Factorization</span>
+                <span class="tech-tag">SentenceTransformers</span>
+                <span class="tech-tag">React + Vite</span>
+                <span class="tech-tag">Docker Compose</span>
+            </div>
+            <div class="cta-buttons">
+                <a href="https://github.com/mounibnasr45/recommender_system" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
+    <article class="article-content">
+        <h2>Overview</h2>
+        <p>
+            The core recommender blends two signals: a matrix-factorization model that learns hidden preference
+            patterns from the ratings matrix, and a content-based genre-similarity score that keeps recommendations
+            explainable and solves the cold-start problem for brand-new movies. A separate semantic search endpoint
+            lets a user type a description like "mind-bending sci-fi thriller" and get back ranked matches by
+            embedding cosine similarity.
+        </p>
+
+        <h3>Semantic search</h3>
+        <pre><code>POST /api/search/description
+{ "query": "mind-bending sci-fi thriller", "top_k": 5 }
+
+→ [
+  { "title": "Inception",  "year": 2010, "genres": ["Action","Sci-Fi","Thriller"], "similarity": 0.92 },
+  { "title": "The Matrix", "year": 1999, "genres": ["Action","Sci-Fi"],             "similarity": 0.89 }
+]</code></pre>
+
+        <h2>Collaborative filtering — matrix factorization with biases</h2>
+        <p>Every predicted rating is a sum of four components:</p>
+        <pre><code>Predicted Rating = Global Mean + User Bias + Movie Bias + Latent Factor Interaction</code></pre>
+        <p>
+            The model learns 15 latent dimensions per user and per movie — invisible traits like "how much this
+            user loves action" or "how strong this movie's sci-fi elements are" — purely from the ratings matrix,
+            with no genre labels involved.
+        </p>
+        <div class="callout">
+            <span class="callout-title">Worked example — predicting Alice's rating for "Inception"</span>
+            <p>
+                Global baseline 3.52 + Alice's user bias (+0.30, a generous rater) + Inception's movie bias (+0.50,
+                a high-quality film) + latent factor match (+0.62, her love of action/complex-plots/sci-fi aligns
+                with the film's profile) = <strong>4.94 / 5</strong>.
+            </p>
+        </div>
+
+        <h2>Content-based filtering — Jaccard genre similarity (20% weight)</h2>
+        <pre><code>Similarity Score = Common Genres / Total Unique Genres</code></pre>
+        <p>
+            Inception vs. The Matrix share all three genres (Action, Sci-Fi, Thriller) → similarity 1.00. Inception
+            vs. Titanic share none → similarity 0.00. A user's past ratings are then weighted by similarity to
+            produce a content-based prediction — this is what lets the system recommend a brand-new movie that has
+            never been rated by anyone.
+        </p>
+
+        <h2>Hybrid combination</h2>
+        <pre><code>Hybrid Score = (0.8 × Collaborative Score) + (0.2 × Content Score)</code></pre>
+        <p>
+            The 80/20 split was chosen empirically, not assumed. Sweeping the blend ratio during development showed
+            pure collaborative filtering alone (RMSE 0.92) and pure content-based alone (RMSE 1.15) both
+            underperform the 80/20 hybrid (RMSE 0.86) — a 50/50 blend was also tested and came out worse (RMSE
+            0.94) than either extreme-leaning option.
+        </p>
+
+        <h2>Training</h2>
+        <p>
+            90,274 ratings are split 60/20/20 into training, validation, and test sets. The model trains with
+            stochastic gradient descent for up to 50 epochs, with early stopping after 10 epochs without validation
+            improvement.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Hyperparameter</th><th>Value</th></tr></thead>
+                <tbody>
+                    <tr><td>Latent factors</td><td>15</td></tr>
+                    <tr><td>Learning rate</td><td>0.005</td></tr>
+                    <tr><td>Regularization</td><td>0.25</td></tr>
+                    <tr><td>Max epochs / patience</td><td>50 / 10</td></tr>
+                    <tr><td>Collaborative / content weight</td><td>0.80 / 0.20</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Model performance</h2>
+        <div class="metric-grid">
+            <div class="metric-card"><span class="metric-number">0.8598</span><span class="metric-label">Test RMSE</span></div>
+            <div class="metric-card"><span class="metric-number">0.6590</span><span class="metric-label">Test MAE</span></div>
+            <div class="metric-card"><span class="metric-number">0.0013</span><span class="metric-label">Val–Test gap</span></div>
+        </div>
+        <p>
+            A test RMSE of 0.86 on a 0.5–5.0 star scale means predictions land within roughly 17% of the true
+            rating on average. The near-identical validation and test RMSE (gap of just 0.0013) is the strongest
+            signal here: it means the validation set was a reliable proxy for real generalization, and the model
+            wasn't quietly overfitting to it.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Approach</th><th>Test RMSE</th></tr></thead>
+                <tbody>
+                    <tr><td>Random guessing</td><td>1.50</td></tr>
+                    <tr><td>Global mean</td><td>1.20</td></tr>
+                    <tr><td>Item mean</td><td>0.98</td></tr>
+                    <tr><td>Pure collaborative filtering</td><td>0.92</td></tr>
+                    <tr><td><strong>Hybrid model (shipped)</strong></td><td><strong>0.86</strong></td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Real recommendation quality</h2>
+        <p>
+            For a heavy user (842 ratings) who favors critically-acclaimed dark dramas like <em>The Godfather</em>
+            and <em>Fight Club</em>, the top recommendations were <em>Paths of Glory</em>, <em>Man Bites Dog</em>,
+            and <em>Three Billboards Outside Ebbing, Missouri</em> — all Crime/Drama, all thematically dark, none of
+            them simply "popular movies." For a light user (28 ratings) who rates almost everything 5 stars on
+            action blockbusters, the model still surfaced <em>The Shawshank Redemption</em> as a top pick, driven by
+            the user-bias correction rather than genre overlap alone.
+        </p>
+
+        <h2>Tech stack</h2>
+        <div class="table-wrap">
+            <table>
+                <tbody>
+                    <tr><td><strong>Backend</strong></td><td>FastAPI (port 8000)</td></tr>
+                    <tr><td><strong>Frontend</strong></td><td>React + Vite (port 3000)</td></tr>
+                    <tr><td><strong>Semantic search</strong></td><td>SentenceTransformer embeddings + cosine similarity, pre-computed for fast queries</td></tr>
+                    <tr><td><strong>Deployment</strong></td><td>Docker Compose (frontend + backend together)</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="cta-buttons" style="margin-top: 2rem;">
+            <a href="https://github.com/mounibnasr45/recommender_system" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+        </div>
+    </article>
+
+    <footer class="article-footer">
+        <div class="container">
+            <p>&copy; 2026 Mounib Nasr. All rights reserved.</p>
+            <div class="footer-social">
+                <a href="mailto:mounibnasr123@gmail.com"><i class="fas fa-envelope"></i></a>
+                <a href="https://www.linkedin.com/in/mounib-nasr-073899244/" target="_blank"><i class="fab fa-linkedin"></i></a>
+                <a href="https://github.com/mounibnasr45" target="_blank"><i class="fab fa-github"></i></a>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>
