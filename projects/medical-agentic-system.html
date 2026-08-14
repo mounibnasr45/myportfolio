@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Medical Agentic System — Case Study | Mounib Nasr</title>
-    <meta name="description" content="A multi-agent clinical decision support system built with CrewAI, GraphRAG, Neo4j, and LangChain memory.">
+    <meta name="description" content="A multi-agent clinical question-answering system over a temporal knowledge graph: LLM routing, GraphRAG retrieval, and the full reasoning pipeline streamed live to the browser.">
     <link rel="stylesheet" href="../styles.css">
     <link rel="stylesheet" href="../project.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -23,134 +23,516 @@
             <span class="eyebrow">Case Study</span>
             <h1>Medical Agentic System</h1>
             <p class="tagline">
-                An enterprise-grade AI medical assistant combining multi-agent orchestration, GraphRAG
-                (graph + vector retrieval), and conversational memory to deliver context-aware, evidence-grounded
-                clinical decision support — drug interactions, contraindications, and treatment guidance.
+                Multi-agent clinical question answering over a temporal knowledge graph. An LLM router decides how
+                much machinery each question deserves before any work begins — and the entire reasoning pipeline,
+                every agent and every tool call, streams to the browser as it runs.
             </p>
             <div class="tech-badges">
                 <span class="tech-tag">CrewAI</span>
                 <span class="tech-tag">Neo4j + Graphiti</span>
-                <span class="tech-tag">FastAPI</span>
-                <span class="tech-tag">LangChain Memory</span>
-                <span class="tech-tag">Groq Llama 3.3</span>
+                <span class="tech-tag">Gemini 2.5 Flash</span>
+                <span class="tech-tag">FastAPI + SSE</span>
+                <span class="tech-tag">React 19</span>
             </div>
             <div class="cta-buttons">
-                <a href="https://github.com/mounibnasr45/medical_agentic_system" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+                <a href="https://medical-agent-ui.onrender.com/" target="_blank" class="btn btn-primary"><i class="fas fa-globe"></i> Live Demo</a>
+                <a href="https://medical-agent-api-xvy2.onrender.com/docs" target="_blank" class="btn btn-secondary"><i class="fas fa-code"></i> API Docs</a>
+                <a href="https://github.com/mounibnasr45/medical_agentic_system" target="_blank" class="btn btn-secondary"><i class="fab fa-github"></i> View on GitHub</a>
             </div>
         </div>
     </section>
 
     <article class="article-content">
         <h2>Overview</h2>
+        <div class="metric-grid">
+            <div class="metric-card">
+                <span class="metric-number">3</span>
+                <span class="metric-label">specialised agents, activated per query</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">1&ndash;5</span>
+                <span class="metric-label">complexity score driving the plan</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">11</span>
+                <span class="metric-label">typed trace events streamed live</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">3</span>
+                <span class="metric-label">retrieval sources, fused and scored</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">512<small>MB</small></span>
+                <span class="metric-label">total memory budget in production</span>
+            </div>
+        </div>
         <p>
-            The system routes each incoming question through an LLM-powered router that scores intent and
-            complexity, then dynamically allocates 1–3 specialized CrewAI agents — a clinical researcher, a safety
-            validator, and a clinical analyst — to answer it. Every session keeps conversational memory so follow-up
-            questions ("what are its interactions?") resolve against the drug named earlier in the conversation.
+            A question is routed by a model before any work begins. The router decides whether the question is
+            medical at all, how complex it is, which of three agents to activate, how many tool iterations each one
+            gets, and whether the answer needs explicit step-by-step reasoning. A definition lookup runs one agent
+            against one source. A multi-drug safety question runs three agents across a knowledge graph, generated
+            Cypher, and web search.
+        </p>
+        <p>
+            The browser shows that decision as it happens: the routing verdict, each agent activating, every tool
+            call with its measured latency, and each reasoning step as it lands.
+        </p>
+        <div class="callout">
+            <span class="callout-title">Design thesis</span>
+            <p>
+                An agent system you cannot watch is one you cannot debug, and one nobody should trust. Every
+                architectural decision here serves two properties: <strong>the work is proportional to the
+                question</strong>, and <strong>the reasoning is observable from outside the process</strong>. The
+                trace is not a debug log bolted on afterwards — it is a first-class output, produced by
+                instrumenting the tools directly rather than depending on framework callbacks.
+            </p>
+        </div>
+        <p>
+            The public demo caps each visitor at five queries per day. The example questions are pre-computed and
+            exempt from that limit, so the system can be explored without spending the allowance.
         </p>
 
-        <h2>Architecture</h2>
-        <pre><code>FastAPI /ask (session_id, query)
-        │
-        ▼
-MemoryManager (LangChain)  — load session history, inject context
-        │
-        ▼
-Intelligent Router (Groq Llama-3.3-70B)
-  - classify intent, score complexity 1-5
-  - pick 1-3 agents, set iteration limits
-        │
-        ▼
-Medical Crew (CrewAI)
-  ┌─────────────────────────────┐
-  │ Clinical Researcher          │  Tools: Graph DB, Web Search, Cypher
-  │ Safety Validator (optional)  │  Cross-checks contraindications
-  │ Clinical Analyst (optional)  │  Synthesizes final recommendation
-  └─────────────────────────────┘
-        │
-        ▼
-Tools Layer → Neo4j + Graphiti (hybrid vector+graph) / DuckDuckGo / Cypher
-        │
-        ▼
-Response + memory update + cache write</code></pre>
-
-        <h3>Intelligent query router</h3>
+        <h2>System architecture</h2>
         <p>
-            A Groq Llama-3.3-70B call analyzes every query and returns a validated Pydantic
-            <code>QueryAnalysis</code> — intent, a 1–5 complexity score, which agents to spin up, per-agent
-            iteration budgets, and a rejection path for non-medical queries. Nothing downstream trusts free-text
-            classification; the router's output is a typed contract.
+            Two Render services: a static React bundle and a single-worker FastAPI container. The split is
+            deliberate — static sites consume none of the free tier's 750 instance-hours, which leaves the entire
+            budget for the API, and the interface paints instantly while the backend is still cold.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart TB
+    subgraph client["Browser"]
+        UI["React 19 SPA<br/>chat + live trace console"]
+    end
+
+    subgraph service["API — FastAPI, single worker, 512MB"]
+        API["Request layer<br/>CORS allowlist · per-IP daily quota"]
+        Cache{"showcase or<br/>cache hit?"}
+        Router{"LLM router<br/>temperature 0"}
+        Reject(["Refused — no agent runs"])
+        Crew["Sequential crew<br/>CrewAI, 1–3 agents"]
+        Par["Parallel retrieval<br/>asyncio.gather + LLM merge"]
+        Bus[["Trace event bus<br/>request-scoped contextvar"]]
+        API --> Cache
+        Cache -->|"miss"| Router
+        Router -->|"non-medical"| Reject
+        Router -->|"simple"| Crew
+        Router -->|"complex interaction"| Par
+        Router -.-> Bus
+    end
+
+    subgraph agents["Agents — added only when the plan calls for them"]
+        R["Clinical Researcher<br/>gathers evidence"]
+        V["Safety Validator<br/>grades interaction severity"]
+        An["Medical Analyst<br/>synthesises · no tools"]
+        R --> V --> An
+    end
+
+    subgraph tools["Retrieval — instrumented, 1h cache"]
+        G[("Neo4j + Graphiti<br/>hybrid RRF search")]
+        Cy["Generated Cypher<br/>read-only guard"]
+        W["Web search"]
+    end
+
+    UI -->|"POST /ask/stream"| API
+    Cache -->|"hit"| UI
+    Crew --> R
+    R --> G
+    R --> Cy
+    R --> W
+    V --> G
+    Par --> G
+    Par --> Cy
+    Par --> W
+    G -.->|"paused or unreachable"| Degrade["Gateway marks unavailable<br/>30s cooldown → web + LLM"]
+    G -.-> Bus
+    Cy -.-> Bus
+    W -.-> Bus
+    Bus -.->|"11 typed SSE events"| UI
+            </div>
+        </div>
+
+        <h2>The AI engineering</h2>
+        <p>
+            The framework work is the least interesting part of this system. What follows is the engineering that
+            makes an LLM pipeline behave like a service rather than a demo.
+        </p>
+
+        <h3>Routing is a typed contract, not a classification</h3>
+        <p>
+            One deterministic call at <code>temperature=0</code> returns a JSON plan that everything downstream
+            obeys. Routing with a model rather than keyword matching is the whole point: <em>"can I take these two
+            together"</em> and <em>"is this combination safe"</em> need identical handling, and no keyword list
+            captures that. The model's output is parsed into a validated dataclass, with every field clamped —
+            complexity to 1–5, agent names to a known set, iteration budgets to integers with defaults. Nothing
+            downstream ever sees free text.
         </p>
         <pre><code>QueryAnalysis(
-    intent="drug_interaction",
-    complexity=3,
-    required_agents=["researcher", "validator", "analyst"],
-    max_iterations={"researcher": 4, "validator": 2, "analyst": 2},
-    suggested_tools=["graph_db", "web_search"],
     is_medical=True,
+    intent="interaction",
+    complexity=4,
     confidence=0.95,
-    reasoning="Complex drug interaction requires multi-agent validation"
+    required_agents=["researcher", "validator", "analyst"],
+    max_iterations={"researcher": 5, "validator": 3, "analyst": 1},
+    suggested_tools=["graph_db", "cypher", "web_search"],
+    use_chain_of_thought=True,
+    cot_reasoning_steps=["identify each drug's mechanism", "…"],
+    reasoning="Multi-drug analysis; safety-critical, needs validation",
 )</code></pre>
-
-        <h3>GraphRAG knowledge system</h3>
         <p>
-            Medical entities and relationships live in Neo4j; Graphiti layers hybrid vector + graph search on top,
-            using <code>all-MiniLM-L6-v2</code> embeddings for semantic matching alongside graph traversal. A
-            DuckDuckGo web-search tool is the fallback whenever the graph has no answer, and a direct Cypher-query
-            tool handles complex pattern matching the hybrid search doesn't cover.
+            The router costs one cheap call and saves running three agents on a question that needs one. It is also
+            the only component that must never hard-fail. If the routing call errors, it falls back to a
+            conservative configuration that runs the full crew — a wasted crew run is cheaper than wrongly refusing
+            a legitimate clinical question. Non-medical queries are refused <em>at the router</em>, before any
+            expensive work is scheduled.
         </p>
 
-        <h3>Conversation memory</h3>
+        <h3>Two execution topologies, chosen by the plan</h3>
         <p>
-            Each session gets an isolated LangChain <code>ConversationBufferMemory</code>, summarized automatically
-            once a conversation passes ten messages. Memory is in-process (no disk I/O), so context injection into a
-            follow-up query is effectively free.
+            The router's output selects between two fundamentally different shapes of work:
         </p>
-
-        <h2>Performance optimizations</h2>
         <ul>
-            <li><strong>Multi-level caching</strong> — MD5-hashed response cache (1-hour TTL) plus a separate tool-level cache for graph DB and web-search results.</li>
-            <li><strong>Lazy loading</strong> — the Neo4j driver, the Graphiti client, and the embeddings model are all initialized on first use, not at startup.</li>
-            <li><strong>Streaming</strong> — Server-Sent Events expose the agents' live reasoning ("recherche en cours…") instead of a blank wait.</li>
-            <li><strong>Tool diversity enforcement</strong> — agents are prompted to switch tools between iterations rather than repeating a query that already returned nothing useful.</li>
+            <li>
+                <strong>Sequential crew</strong> — CrewAI agents run in order, each one's output becoming the
+                next one's task context. Researcher gathers, validator grades severity, analyst writes for a
+                non-specialist. Agent count and per-agent iteration caps come straight from the plan.
+            </li>
+            <li>
+                <strong>Parallel retrieval</strong> — every relevant source is queried concurrently under
+                <code>asyncio.gather</code> with a hard 20-second ceiling, each result is confidence-scored, and an
+                LLM merge step cross-references them and is instructed to state disagreement explicitly rather than
+                paper over it. Selected when complexity ≥ 3, two or more tools are suggested, <em>and</em> the
+                intent is an interaction check — the only case where several sources will agree or disagree
+                usefully.
+            </li>
         </ul>
 
-        <h2>Processing mode selection</h2>
+        <h3>Observability: the trace comes from the tools, not the framework</h3>
         <p>
-            Two execution modes share the same router output: <strong>Crew mode</strong> (sequential, CrewAI
-            task delegation) for most queries, and <strong>MCP mode</strong> (parallel tool execution) auto-selected
-            when complexity ≥ 3, the intent is an interaction check, and multiple tools are needed at once — with a
-            manual <code>use_mcp</code> override available on the API.
+            Each tool publishes <code>tool_started</code> / <code>tool_completed</code> — with elapsed
+            milliseconds, cache status, and success — to a request-scoped event bus held in a
+            <code>contextvars.ContextVar</code>. Any code on that context can publish without being handed a
+            reference, and when no sink is bound, publishing is a no-op, which keeps the same tools usable from
+            tests, scripts, and the non-streaming endpoint with no special-casing.
+        </p>
+        <p>
+            This is deliberately independent of CrewAI's internals, which are not a stable API. It also forced a
+            real concurrency fix: CrewAI executes synchronously in a worker thread, and context variables do not
+            cross <code>run_in_executor</code> on their own, so the pipeline copies the context explicitly. Without
+            that copy, every tool event raised inside a crew run is silently dropped and the UI shows a blank
+            pipeline while the answer works perfectly.
+        </p>
+        <pre><code>ctx = contextvars.copy_context()
+return await loop.run_in_executor(None, lambda: ctx.run(_kickoff))</code></pre>
+        <p>
+            The sink itself is written so that a broken trace can never take down the query it describes: emitting
+            is thread-safe via <code>call_soon_threadsafe</code>, and a closed or shut-down loop drops the event
+            instead of raising.
+        </p>
+
+        <h3>Chain of thought as structured data</h3>
+        <p>
+            When the router flags a question as safety-critical it supplies 3–5 concrete reasoning steps, and a
+            separate processor works the findings through them. An earlier version formatted the reasoning into
+            markdown and prepended it to the answer, which meant the interface could only render a wall of text.
+            Each step is now emitted as its own typed event with a name, reasoning, and conclusion, so the UI
+            renders reasoning as it arrives and the answer itself stays clean. The parser is deliberately tolerant:
+            a malformed model response still yields an answer.
+        </p>
+
+        <h2>How one request flows</h2>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant API as FastAPI
+    participant Bus as Trace bus
+    participant R as LLM router
+    participant X as Crew / parallel retrieval
+    participant T as Tools
+    participant KG as Neo4j + Graphiti
+
+    B->>API: POST /ask/stream
+    API->>API: quota check — showcase queries exempt
+    API->>Bus: bind sink to request context
+    Bus-->>B: stage_started · quota
+
+    API->>R: analyse query (temperature 0)
+    R-->>API: typed plan
+    R->>Bus: router_completed
+    Bus-->>B: intent · complexity · agents · tools
+
+    alt not medical
+        API-->>B: rejected — no agent ever runs
+    else medical
+        API->>X: execute the plan
+        loop per tool call, capped by the plan
+            T->>Bus: tool_started
+            Bus-->>B: tool + query
+            T->>KG: hybrid search / generated Cypher
+            KG-->>T: facts — or explicit "unavailable"
+            T->>Bus: tool_completed
+            Bus-->>B: latency_ms · cached · ok
+        end
+        X-->>API: findings
+        opt router requested explicit reasoning
+            API->>Bus: cot_step × N
+            Bus-->>B: step name · reasoning · conclusion
+        end
+        API-->>B: answer
+        API-->>B: run_completed · mode, latency, sources, confidence
+    end
+            </div>
+        </div>
+        <p>
+            Both <code>/ask</code> and <code>/ask/stream</code> call one <code>run_query</code> implementation, so
+            there is exactly one description of what happens to a question. The only difference between the two
+            endpoints is how the trace is delivered.
+        </p>
+
+        <h2>Retrieval and the knowledge graph</h2>
+        <p>
+            Medical entities and their relationships live in Neo4j, with Graphiti layering temporal GraphRAG on
+            top — hybrid vector and graph search fused by reciprocal rank, reranked by a Gemini cross-encoder over
+            768-dimension embeddings. Three retrieval paths sit above it:
+        </p>
+        <ul>
+            <li><strong>Hybrid graph search</strong> for entities the graph is likely to know — returns extracted facts, falling back to entity summaries when edges are thin.</li>
+            <li><strong>Generated Cypher</strong> for multi-hop traversals the hybrid search cannot express: every drug interacting with warfarin, all contraindications for a condition.</li>
+            <li><strong>Web search</strong> for recent or rare drugs outside the seeded dataset, labelled as such in the trace.</li>
+        </ul>
+        <p>
+            Both cache layers are keyed with intent. The response cache normalises word order, so
+            <em>"aspirin warfarin interaction"</em> and <em>"interaction warfarin aspirin"</em> resolve to one
+            entry — but it is scoped per session, because answers depend on conversation context. The tool cache
+            has a subtler rule: a graph-unavailable result is deliberately <em>never</em> cached. Storing a
+            degradation would pin the fallback in place for an hour after the database came back.
+        </p>
+
+        <h2>Safety and reliability engineering</h2>
+
+        <h3>Generated Cypher is treated as untrusted input</h3>
+        <p>
+            Cypher is written by an LLM from user text and then executed against the database, so a prompt-injected
+            <code>DETACH DELETE</code> is a live risk, not a theoretical one. Every generated query passes a
+            write-clause denylist — covering mutations, procedure calls, and <code>apoc</code>/<code>dbms</code>
+            namespaces — is rejected if it contains multiple statements, and is then executed with explicit read
+            routing and a hard timeout. Both controls, because either alone is one bug away from a wiped graph.
+        </p>
+        <pre><code>@staticmethod
+def reject_if_unsafe(cypher: str) -> str | None:
+    """Return a reason when the generated Cypher is not a plain read."""
+    if not cypher or not cypher.strip():
+        return "empty query"
+    match = _WRITE_CLAUSE.search(cypher)
+    if match:
+        return f"non-read clause '{match.group(0).strip()}'"
+    if ";" in cypher.strip().rstrip(";"):
+        return "multiple statements"
+    return None</code></pre>
+        <p>
+            A rejection is itself a trace event — the guard firing is visible in the UI, not buried in a log.
+        </p>
+
+        <h3>The graph degrades instead of failing</h3>
+        <p>
+            The demo runs on Neo4j AuraDB Free, which pauses after a few days idle. All graph access goes through
+            a gateway that owns a single long-lived client, verifies connectivity on connect, tracks availability,
+            and refuses to retry inside a 30-second cooldown — so one paused database cannot add a connection
+            timeout to every subsequent request. Callers ask for a client and get <code>None</code> when the graph
+            is unusable; tools then return an explicit signal, and the agents are instructed to answer from web
+            search <em>while stating that graph verification was not possible</em>. Degrading silently would be
+            worse than failing.
+        </p>
+
+        <h3>Failure isolation, end to end</h3>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Component</th><th>On failure</th></tr></thead>
+                <tbody>
+                    <tr><td>Router</td><td>Conservative full-crew configuration — never refuses a question because routing broke</td></tr>
+                    <tr><td>Any tool</td><td>Caught, traced as <code>ok: false</code>, returned as text the agent can reason about</td></tr>
+                    <tr><td>Graph</td><td>Gateway returns <code>None</code>; agents answer from web and say so</td></tr>
+                    <tr><td>Cypher guard</td><td>Query rejected with a reason, surfaced in the trace</td></tr>
+                    <tr><td>Merge step</td><td>Raw scored sources returned instead of a synthesis</td></tr>
+                    <tr><td>Reasoning pass</td><td>Falls back to the research findings, confidence marked low</td></tr>
+                    <tr><td>Trace bus</td><td>Drops the event — never fails the query it is describing</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Runtime engineering</h2>
+
+        <h3>All graph work runs on one dedicated event loop</h3>
+        <p>
+            Neo4j's async driver binds its internal locks to the loop that opened the connection pool, and this
+            process has several: the request loop, plus a fresh one per <code>asyncio.run()</code> inside tools
+            that CrewAI invokes synchronously from worker threads. Sharing a cached client across them fails with
+            <code>&lt;AsyncRLock&gt; is bound to a different event loop</code> — and because graph tools degrade
+            rather than raise, that failure is <em>invisible</em>: the agent quietly answers from web search and
+            the response still looks fine. The fix is structural: one long-lived loop in a background thread owns
+            every graph coroutine, with sync and async submission helpers on top.
+        </p>
+
+        <h3>The provider was chosen by measurement, not preference</h3>
+        <p>
+            The system began on Groq and moved to Gemini for two concrete reasons found by running it. Graphiti's
+            entity-extraction prompts reach roughly 19k tokens per episode against a 12k tokens-per-minute ceiling
+            on Groq's free tier — a single oversized request, which no amount of pacing or retrying can satisfy.
+            Separately, CrewAI 1.x marks cache breakpoints on agent messages and strips them only for providers it
+            supports natively; Groq is not one, so those messages reach the API carrying a property it rejects, and
+            every crew run fails. Both providers stay selectable through <code>AGENT_LLM_PROVIDER</code> and
+            <code>GRAPH_LLM_PROVIDER</code> for anyone on a paid tier.
+        </p>
+
+        <h3>Fitting an agent system into 512MB</h3>
+        <p>
+            The original <code>sentence-transformers</code> embedder pulled in torch — roughly 2.5GB of image and
+            over 500MB resident, against a 512MB deployment ceiling. Moving embeddings to an API call was the
+            difference between deployable and not. The same budget shapes the rest: sessions are an LRU-bounded
+            registry capped at 200 conversations of 40 messages, injecting only the last six turns into a prompt;
+            the response cache evicts its oldest entry at 500. A related trap was fixed by being explicit — Graphiti
+            silently defaults an unset cross-encoder to an OpenAI reranker, which demands a key this deployment
+            does not have and fails only in production, on any machine where that variable happens to be set
+            locally.
         </p>
 
         <h2>Tech stack</h2>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart LR
+    subgraph L1["Interface"]
+        A1["React 19 · TypeScript"]
+        A2["Tailwind 4 · Vite"]
+        A3["EventSource — SSE client"]
+    end
+
+    subgraph L2["Service"]
+        B1["FastAPI · Pydantic"]
+        B2["Uvicorn — single worker"]
+        B3["StreamingResponse — SSE"]
+        B4["Per-IP quota · CORS allowlist"]
+    end
+
+    subgraph L3["Agent layer"]
+        C1["LLM router — typed plan"]
+        C2["CrewAI — 3 roles"]
+        C3["Parallel retrieval — asyncio"]
+        C4["Chain-of-thought processor"]
+        C5["Trace bus — contextvars"]
+    end
+
+    subgraph L4["Knowledge &amp; retrieval"]
+        D1[("Neo4j AuraDB")]
+        D2["Graphiti — temporal GraphRAG"]
+        D3["Gemini embeddings · 768d"]
+        D4["Generated Cypher + guard"]
+        D5["Web search"]
+    end
+
+    subgraph L5["Models"]
+        E1["Gemini 2.5 Flash<br/>router · agents · merge"]
+        E2["Gemini 2.5 Flash Lite<br/>hybrid-search reranker"]
+        E3["Groq Llama 3.3 70B<br/>selectable alternative"]
+    end
+
+    subgraph L6["Delivery"]
+        F1["Docker · Ruff · pytest"]
+        F2["GitHub Actions — CI gate"]
+        F3["Render — static + web service"]
+    end
+
+    A1 --> B1
+    B1 --> C1
+    C1 --> D1
+    C1 --> E1
+    D2 --> E2
+    F2 -.->|"gates every deploy"| B2
+            </div>
+        </div>
         <div class="table-wrap">
             <table>
                 <tbody>
-                    <tr><td><strong>Core</strong></td><td>Python, FastAPI, CrewAI, LangChain, Neo4j + Graphiti</td></tr>
-                    <tr><td><strong>Query routing / agent LLM</strong></td><td>Groq Llama-3.3-70B</td></tr>
-                    <tr><td><strong>Embeddings</strong></td><td>all-MiniLM-L6-v2 (semantic vector search)</td></tr>
-                    <tr><td><strong>Web fallback</strong></td><td>DuckDuckGo Search API</td></tr>
-                    <tr><td><strong>Infra</strong></td><td>Uvicorn, Pydantic, Docker, structured Python logging</td></tr>
+                    <tr><td><strong>Orchestration</strong></td><td>CrewAI — three role-specialised agents, composed per query</td></tr>
+                    <tr><td><strong>Reasoning model</strong></td><td>Gemini <code>2.5-flash</code> (Groq Llama 3.3 70B selectable via <code>AGENT_LLM_PROVIDER</code>)</td></tr>
+                    <tr><td><strong>Knowledge graph</strong></td><td>Neo4j AuraDB with Graphiti temporal GraphRAG, hybrid RRF search</td></tr>
+                    <tr><td><strong>Embeddings</strong></td><td>Gemini <code>gemini-embedding-001</code>, 768 dimensions</td></tr>
+                    <tr><td><strong>API</strong></td><td>FastAPI, Server-Sent Events, Pydantic-validated requests</td></tr>
+                    <tr><td><strong>Frontend</strong></td><td>React 19, TypeScript, Tailwind 4, Vite</td></tr>
+                    <tr><td><strong>CI/CD</strong></td><td>GitHub Actions gating Render deploy hooks; Docker</td></tr>
                 </tbody>
             </table>
         </div>
 
-        <h2>Sample test cases</h2>
+        <h2>Delivery</h2>
+        <p>
+            Render's auto-deploy is switched off on purpose: its default is to deploy on every push, which bypasses
+            CI entirely and would happily ship a red build. Deploys are triggered by GitHub Actions only after
+            tests pass, and the deploy job then polls <code>/health</code> until the new revision answers.
+        </p>
         <div class="table-wrap">
             <table>
-                <thead><tr><th>Query</th><th>Expected routing</th></tr></thead>
+                <thead><tr><th>Workflow</th><th>Trigger</th><th>Purpose</th></tr></thead>
                 <tbody>
-                    <tr><td>"What is Aspirin?"</td><td>1 agent, 3 iterations</td></tr>
-                    <tr><td>"Can I take Aspirin with Warfarin?"</td><td>2 agents (researcher + validator), 4 iterations</td></tr>
-                    <tr><td>"All contraindications for bleeding disorders?"</td><td>3 agents, 5 iterations, all tools</td></tr>
-                    <tr><td>"What's the weather today?"</td><td>Instant rejection — non-medical</td></tr>
+                    <tr><td><code>ci.yml</code></td><td>push, PR</td><td>Ruff lint and format, pytest, frontend typecheck and build, Docker build plus a live container health check</td></tr>
+                    <tr><td><code>deploy.yml</code></td><td>CI success on <code>main</code></td><td>Calls both Render deploy hooks, then waits for <code>/health</code></td></tr>
+                    <tr><td><code>keepalive.yml</code></td><td>every 10 minutes</td><td>Pings <code>/health</code>, keeping the instance and AuraDB Free awake</td></tr>
                 </tbody>
             </table>
         </div>
+        <p>
+            Seven test modules cover the pure logic and every path that resolves before a model or database call —
+            the Cypher guard, the event bus across thread boundaries, cache keying, quota accounting, reasoning
+            parsing — so the whole suite runs in CI with no API keys at all. The Docker job boots the image with
+            <code>GRAPH_ENABLED=false</code> and curls <code>/health</code>, which proves the container starts and
+            serves with no database and no model keys: exactly the condition Render's health check imposes.
+        </p>
+
+        <h2>API</h2>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
+                <tbody>
+                    <tr><td><code>POST /ask</code></td><td>Answer a question, returning the result once complete</td></tr>
+                    <tr><td><code>POST /ask/stream</code></td><td>The same, streaming the pipeline trace as SSE</td></tr>
+                    <tr><td><code>GET /health</code></td><td>Liveness and dependency status; makes no model calls</td></tr>
+                    <tr><td><code>GET /showcase</code></td><td>Example queries and whether each is pre-computed</td></tr>
+                    <tr><td><code>GET /quota</code></td><td>The caller's remaining daily allowance</td></tr>
+                    <tr><td><code>GET /sessions/{id}/history</code></td><td>Conversation history</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Routing behaviour</h2>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Query</th><th>Plan</th></tr></thead>
+                <tbody>
+                    <tr><td>"What is Aspirin?"</td><td>Complexity 1 — researcher only, graph search, no explicit reasoning</td></tr>
+                    <tr><td>"Can I take Aspirin with Warfarin?"</td><td>Complexity 3 — researcher + validator, graph and Cypher, reasoning enabled</td></tr>
+                    <tr><td>"All contraindications for bleeding disorders?"</td><td>Complexity 4–5 — all three agents, parallel retrieval across every source</td></tr>
+                    <tr><td>"What's the weather today?"</td><td>Refused at the router — no agent, no tool, no model spend</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Limitations</h2>
+        <p>
+            Stated plainly, because a system that hides them is not one worth trusting.
+        </p>
+        <ul>
+            <li><strong>Not medical advice.</strong> This is an engineering demonstration. The graph holds a small curated drug dataset, not a clinical knowledge base, and no clinician reviews the answers.</li>
+            <li><strong>No evaluation suite.</strong> Routing accuracy is unmeasured. A labelled set scoring intent and complexity against ground truth is the obvious next step — and its absence is precisely why this page quotes no accuracy numbers.</li>
+            <li><strong>State is per-process.</strong> Sessions, the response cache, and the rate limiter all live in memory and reset on restart. Redis is the production answer; it is not free.</li>
+            <li><strong>Single instance.</strong> One worker on 512MB. The rate limiter assumes this and would need a shared store before scaling out.</li>
+            <li><strong>Cold starts.</strong> The free tier sleeps after fifteen minutes idle. The keep-alive ping covers this, and the UI reports honest progress when it does not.</li>
+            <li><strong>Answer quality is bounded by the graph.</strong> Drugs outside the seeded dataset fall through to web search, which is less reliable — and is labelled as such in the trace.</li>
+        </ul>
 
         <div class="cta-buttons" style="margin-top: 2rem;">
-            <a href="https://github.com/mounibnasr45/medical_agentic_system" target="_blank" class="btn btn-primary"><i class="fab fa-github"></i> View on GitHub</a>
+            <a href="https://medical-agent-ui.onrender.com/" target="_blank" class="btn btn-primary"><i class="fas fa-globe"></i> Try the Live Demo</a>
+            <a href="https://github.com/mounibnasr45/medical_agentic_system" target="_blank" class="btn btn-secondary"><i class="fab fa-github"></i> View on GitHub</a>
         </div>
     </article>
 
@@ -164,5 +546,10 @@ Response + memory update + cache write</code></pre>
             </div>
         </div>
     </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
 </body>
 </html>
