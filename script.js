@@ -8,7 +8,7 @@ hamburger.addEventListener("click", () => {
 })
 
 // Close mobile menu when clicking on a link
-document.querySelectorAll(".nav-link").forEach((n) =>
+document.querySelectorAll(".nav-link, .nav-resume").forEach((n) =>
   n.addEventListener("click", () => {
     hamburger.classList.remove("active")
     navMenu.classList.remove("active")
