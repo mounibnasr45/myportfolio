@@ -292,6 +292,194 @@
   transform: translateY(-2px);
 }
 
+/* ── Audience registers ─────────────────────────────────────────────────
+   Some case studies are read by two audiences at once. These mark which
+   register a section is written in, so a recruiter knows what to skip and
+   an engineer knows where the substance starts. */
+
+.audience-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  margin-bottom: 0.75rem;
+}
+
+.audience-tag--plain {
+  color: #0e7490;
+  background: rgba(6, 182, 212, 0.12);
+}
+
+.audience-tag--tech {
+  color: #4f46e5;
+  background: rgba(99, 102, 241, 0.12);
+}
+
+.article-content .audience-tag + h2 {
+  margin-top: 0;
+}
+
+.register-divider {
+  margin: 4rem 0 2.5rem;
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+/* ── Plain-language cards ───────────────────────────────────────────── */
+
+.plain-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 1.25rem;
+  margin-bottom: 1.75rem;
+}
+
+.plain-card {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 1rem;
+  padding: 1.5rem;
+}
+
+.plain-card .plain-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--gradient-primary);
+  color: #fff;
+  font-size: 1.05rem;
+  margin-bottom: 0.9rem;
+}
+
+.plain-card h4 {
+  font-size: 1.02rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.45rem;
+}
+
+.plain-card p {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ── Three-screen journey ───────────────────────────────────────────── */
+
+.screen-flow {
+  display: grid;
+  gap: 1rem;
+  margin-bottom: 1.75rem;
+}
+
+.screen-step {
+  display: grid;
+  grid-template-columns: 3rem 1fr;
+  gap: 1.25rem;
+  align-items: start;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-left: 4px solid var(--primary-color);
+  border-radius: 0.9rem;
+  padding: 1.35rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+}
+
+.screen-step .screen-num {
+  font-size: 1.5rem;
+  font-weight: 800;
+  line-height: 1;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.screen-step h4 {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.15rem;
+}
+
+.screen-step .screen-meta {
+  display: block;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 0.6rem;
+}
+
+.screen-step p {
+  font-size: 0.97rem;
+  line-height: 1.7;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+/* ── Plain / engineering translation pairs ──────────────────────────── */
+
+.translation {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  border: 1px solid var(--border-color);
+  border-radius: 0.9rem;
+  overflow: hidden;
+  margin-bottom: 1.5rem;
+}
+
+.translation > div {
+  padding: 1.25rem 1.4rem;
+}
+
+.translation .t-plain {
+  background: var(--bg-secondary);
+}
+
+.translation .t-tech {
+  background: var(--bg-primary);
+  border-left: 1px solid var(--border-color);
+}
+
+.translation .t-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--text-light);
+  margin-bottom: 0.5rem;
+}
+
+.translation p {
+  font-size: 0.95rem;
+  line-height: 1.65;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .translation {
+    grid-template-columns: 1fr;
+  }
+
+  .translation .t-tech {
+    border-left: 0;
+    border-top: 1px solid var(--border-color);
+  }
+}
+
 @media (max-width: 768px) {
   .article-hero h1 {
     font-size: 2rem;
@@ -303,5 +491,10 @@
 
   .article-content h2 {
     font-size: 1.5rem;
+  }
+
+  .screen-step {
+    grid-template-columns: 1fr;
+    gap: 0.5rem;
   }
 }

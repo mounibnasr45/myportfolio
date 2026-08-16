@@ -1,0 +1,793 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SkillBridge AI — Case Study | Mounib Nasr</title>
+    <meta name="description" content="A multi-tenant SaaS that tells a company which skills its people are missing and what to learn next — powered by a 26-node hierarchical LangGraph pipeline with a human approval gate, parallel resource retrieval and full run-level observability.">
+    <link rel="stylesheet" href="../styles.css">
+    <link rel="stylesheet" href="../project.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <header class="article-header">
+        <div class="container">
+            <a href="../index.html#projects" class="back-link"><i class="fas fa-arrow-left"></i> Back to portfolio</a>
+            <span class="logo-text">MN</span>
+        </div>
+    </header>
+
+    <section class="article-hero">
+        <div class="container">
+            <span class="eyebrow">Case Study · Final-Year Engineering Project</span>
+            <h1>SkillBridge AI</h1>
+            <p class="tagline">
+                A multi-tenant platform that answers one question for a company: <em>given who this person is
+                today and where we need them tomorrow, what should they learn next?</em> An AI pipeline reads the
+                CV, measures it against a target role, proposes a learning roadmap — then stops and asks a human to
+                approve it before spending another cent.
+            </p>
+            <div class="tech-badges">
+                <span class="tech-tag">LangGraph</span>
+                <span class="tech-tag">FastAPI</span>
+                <span class="tech-tag">Next.js 14</span>
+                <span class="tech-tag">Hybrid RAG · Qdrant</span>
+                <span class="tech-tag">Multi-tenant SaaS</span>
+                <span class="tech-tag">Langfuse</span>
+            </div>
+            <div class="cta-buttons">
+                <a href="https://frontend-skill-gaps.vercel.app/" target="_blank" rel="noopener" class="btn btn-primary"><i class="fas fa-globe"></i> Live Demo</a>
+                <a href="https://github.com/mounibnasr45/Skills_gap_pfe" target="_blank" rel="noopener" class="btn btn-secondary"><i class="fab fa-github"></i> View on GitHub</a>
+            </div>
+        </div>
+    </section>
+
+    <article class="article-content">
+
+        <!-- ══════════════════════════════════════════════════════════════
+             PART ONE — written for everyone
+             ══════════════════════════════════════════════════════════════ -->
+
+        <span class="audience-tag audience-tag--plain"><i class="fas fa-user"></i> Part one · no technical background needed</span>
+        <h2>What this is, in plain words</h2>
+        <p>
+            Every company has a gap between the skills it has and the skills it needs. Most discover it the
+            expensive way — a project stalls, or a role sits open for six months. The usual fixes are a spreadsheet
+            somebody maintains by hand, or a training catalogue nobody opens.
+        </p>
+        <p>
+            SkillBridge closes that loop automatically. An HR or L&amp;D lead describes a role they need filled.
+            An employee uploads their CV. The system reads both, works out precisely where the distance is, and
+            produces a personalised learning plan with real courses, articles and videos attached to each step —
+            plus a written explanation of <em>why</em> it recommended what it did.
+        </p>
+
+        <div class="plain-grid">
+            <div class="plain-card">
+                <div class="plain-icon"><i class="fas fa-bullseye"></i></div>
+                <h4>The manager defines the target</h4>
+                <p>
+                    Paste a job description. The system turns it into a structured role — the skills required,
+                    at what level, and why each matters. The manager edits anything it got wrong, then publishes
+                    it to the company. About ninety seconds, one AI call.
+                </p>
+            </div>
+            <div class="plain-card">
+                <div class="plain-icon"><i class="fas fa-user-check"></i></div>
+                <h4>The employee gets their own plan</h4>
+                <p>
+                    They pick a role they are working towards, upload their CV, and watch the analysis happen
+                    live. What comes back is not a score — it is an ordered plan, phase by phase, with learning
+                    material already attached and an estimated number of days.
+                </p>
+            </div>
+            <div class="plain-card">
+                <div class="plain-icon"><i class="fas fa-chart-line"></i></div>
+                <h4>The company sees the whole picture</h4>
+                <p>
+                    A dashboard aggregates every analysis: how ready the workforce is for each role, which skills
+                    are missing most often across the whole company, and how far each person has progressed
+                    through their plan.
+                </p>
+            </div>
+        </div>
+
+        <h3>The part that matters most: it asks before it acts</h3>
+        <p>
+            Plenty of AI tools produce a plan and present it as final. This one deliberately stops halfway. Once
+            the roadmap is drafted — but <em>before</em> it spends time and money hunting down learning resources
+            for every step — the run pauses and shows the draft to the person it is for. They can reorder the
+            phases, drop one, or reject it entirely with a note explaining what is wrong. Only then does the
+            system continue.
+        </p>
+        <div class="callout">
+            <span class="callout-title">Why this was a design goal, not a feature</span>
+            <p>
+                A learning plan somebody did not agree to is a learning plan nobody follows. Pausing for approval
+                costs the system a few seconds and saves it from confidently producing something useless. It also
+                means every plan in the database has a human's decision attached to it — which is what makes the
+                output defensible to an HR team, and auditable later.
+            </p>
+        </div>
+
+        <h3>And it shows its work</h3>
+        <p>
+            While an analysis runs, the screen is not a spinner. It is a live timeline of the actual steps —
+            reading the CV, analysing the role, comparing them, drafting the plan, checking its own draft,
+            searching for material. Each step reports whether it succeeded, and each learning resource is
+            labelled with where it came from. If one source is unavailable, the interface says so rather than
+            quietly returning less.
+        </p>
+
+        <h3>The three screens an employee sees</h3>
+        <div class="screen-flow">
+            <div class="screen-step">
+                <span class="screen-num">01</span>
+                <div>
+                    <h4>The Wizard</h4>
+                    <span class="screen-meta">Before the run · light theme</span>
+                    <p>
+                        Short and deliberately boring. Confirm the target role, upload or reuse a CV, optionally
+                        add a self-assessment, press start. Everything else is inferred, because the target role
+                        was already defined by the manager.
+                    </p>
+                </div>
+            </div>
+            <div class="screen-step">
+                <span class="screen-num">02</span>
+                <div>
+                    <h4>The Cockpit</h4>
+                    <span class="screen-meta">During the run · dark mission-control theme</span>
+                    <p>
+                        Full-screen, dark, and live. The timeline fills in node by node as the pipeline executes,
+                        streamed from the server as it happens. Small status indicators show which retrieval
+                        source answered for each phase. This is where the run pauses for roadmap approval.
+                    </p>
+                </div>
+            </div>
+            <div class="screen-step">
+                <span class="screen-num">03</span>
+                <div>
+                    <h4>The Workspace</h4>
+                    <span class="screen-meta">After the run · light theme</span>
+                    <p>
+                        The results, in three tabs: an <strong>Overview</strong> with the readiness verdict and a
+                        written narrative, a <strong>Gaps</strong> tab listing every skill and the distance to
+                        close, and a <strong>Roadmap</strong> where each phase can be marked in-progress or
+                        completed. A side panel replays the run's timeline for anyone who wants to see how the
+                        answer was produced. The full narrative exports as a PDF.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <h3>What a run actually produces</h3>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Output</th><th>What it is</th></tr></thead>
+                <tbody>
+                    <tr><td><strong>Gap Report</strong></td><td>Every skill where the role's required level exceeds the person's current level, with a severity and an overall readiness score.</td></tr>
+                    <tr><td><strong>Roadmap</strong></td><td>An ordered set of phases — one skill each, with objectives, a difficulty, and an estimated number of days. Phases that do not depend on each other are marked as parallel rather than stacked.</td></tr>
+                    <tr><td><strong>Resources</strong></td><td>Real learning material attached to each phase: web articles, videos, and the company's own internal training documents.</td></tr>
+                    <tr><td><strong>Explanation Report</strong></td><td>A written narrative — readiness verdict, key strengths, key risks, per-skill reasoning, and why the roadmap is ordered the way it is. Exported as a PDF.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="callout">
+            <span class="callout-title">Built as a real product, not a demo</span>
+            <p>
+                One deployment serves many companies at once. Each company's employees, roles and internal
+                training library are completely walled off from every other company's — enforced at the database
+                layer, on every single query, and covered by tests that try to break it. That isolation was
+                designed in from the first schema, not retrofitted.
+            </p>
+        </div>
+
+        <hr class="register-divider">
+
+        <!-- ══════════════════════════════════════════════════════════════
+             PART TWO — written for engineers
+             ══════════════════════════════════════════════════════════════ -->
+
+        <span class="audience-tag audience-tag--tech"><i class="fas fa-code"></i> Part two · engineering</span>
+        <h2>System at a glance</h2>
+        <div class="metric-grid">
+            <div class="metric-card">
+                <span class="metric-number">26</span>
+                <span class="metric-label">LangGraph nodes across 4 composed graphs</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">11</span>
+                <span class="metric-label">top-level nodes, 3 of them compiled subgraphs</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">N</span>
+                <span class="metric-label">parallel retrieval branches via <code>Send</code>, one per phase</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">12</span>
+                <span class="metric-label">containers in the local Compose stack</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">35</span>
+                <span class="metric-label">test modules, unit and integration</span>
+            </div>
+            <div class="metric-card">
+                <span class="metric-number">512<small>MB</small></span>
+                <span class="metric-label">production memory ceiling on the free tier</span>
+            </div>
+        </div>
+
+        <h2>System architecture</h2>
+        <p>
+            A Next.js 14 app talks to a FastAPI service that owns the pipeline. Everything tenant-scoped hangs off
+            a single <code>company_id</code>, and no endpoint ever accepts that value from the client — it comes
+            from the JWT, always. Locally the whole stack runs on Docker Compose; in production the same code
+            runs against managed equivalents behind four environment-variable switches.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart TB
+    subgraph client["Browser — Next.js 14, role-routed"]
+        MW{{"middleware.ts<br/>reads JWT cookie · gates by role"}}
+        EMP["(employee)<br/>Wizard · Cockpit · Workspace"]
+        ADM["(admin)<br/>Dashboard · Roles · Library"]
+        AUTH["(auth)<br/>login · signup · invite"]
+        MW --> EMP
+        MW --> ADM
+        MW --> AUTH
+    end
+
+    subgraph api["FastAPI service"]
+        GUARD["get_current_user → CurrentUser<br/>id · company_id · role<br/>require_admin → 403 on mismatch"]
+        REST["/auth · /employee · /admin · /documents"]
+        SSE["POST /pipeline/stream<br/>Server-Sent Events"]
+        RES["POST /pipeline/:id/resume<br/>injects the human decision"]
+        GUARD --> REST
+        GUARD --> SSE
+        GUARD --> RES
+    end
+
+    subgraph engine["LangGraph engine"]
+        G["PipelineGraph<br/>11 top-level nodes"]
+        CP[["Checkpointer<br/>Redis locally · Postgres in prod"]]
+        LF["Langfuse<br/>one trace per run"]
+        G <--> CP
+        G -.-> LF
+    end
+
+    ARQ["ARQ worker<br/>parse · chunk · embed 384d · max 3 retries"]
+
+    subgraph data["Stores — every query filtered by company_id"]
+        PG[("PostgreSQL")]
+        QD[("Qdrant<br/>one collection per company")]
+        S3[("MinIO / S3<br/>CVs · library docs · report PDFs")]
+    end
+
+    EMP -->|"POST + EventSource"| GUARD
+    ADM --> GUARD
+    AUTH --> GUARD
+    SSE --> G
+    RES -->|"resume from checkpoint"| CP
+    REST -->|"enqueue upload"| ARQ
+    G --> PG
+    G --> S3
+    G --> QD
+    ARQ --> QD
+            </div>
+        </div>
+
+        <h2>LangGraph topology</h2>
+        <p>
+            The pipeline is not a chain. It opens with three independent branches from <code>START</code>, joins
+            on a barrier, and later fans out again — one parallel branch per roadmap phase — through LangGraph's
+            <code>Send</code> mechanism. Three of the eleven top-level nodes are themselves compiled subgraphs,
+            which is what keeps the parent graph readable at 11 boxes instead of 26.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart TB
+    S(["START"]) --> LH["load_history<br/>prior runs for this employee"]
+    S --> JA["job_analysis<br/>JD → structured Target Role"]
+    S --> ID["ingest_documents<br/>CV + assessment from object storage"]
+
+    JA --> PE["profile_extraction"]
+    ID --> PE
+
+    LH --> BAR{{"barrier join<br/>all three must land"}}
+    JA --> BAR
+    PE --> BAR
+
+    BAR --> GAP[["gap_analysis<br/>compiled subgraph · 5 nodes"]]
+    GAP --> RG[["roadmap_generation<br/>compiled subgraph · 6 nodes"]]
+    RG --> RF[["reflect<br/>compiled subgraph · 4 nodes"]]
+
+    RF -->|"rejected · retry ≤ 2"| RG
+    RF -->|"approved, no phases"| MR
+    RF -->|"approved"| FAN{{"Send fan-out — one branch per phase"}}
+
+    FAN --> P1["retrieve_phase_resources<br/>phase 1"]
+    FAN --> P2["retrieve_phase_resources<br/>phase 2"]
+    FAN --> PN["retrieve_phase_resources<br/>phase N"]
+
+    P1 --> MR["merge_resources"]
+    P2 --> MR
+    PN --> MR
+
+    MR --> EX["generate_explanation<br/>narrative + PDF to object storage"]
+    EX --> SU["store_update<br/>single atomic write path"]
+    SU --> E(["END"])
+            </div>
+        </div>
+        <div class="callout">
+            <span class="callout-title">A race condition worth naming</span>
+            <p>
+                <code>profile_extraction</code> originally depended only on <code>ingest_documents</code>. But its
+                prompt injects the role's required skills, which come from <code>job_analysis</code> — so whenever
+                <code>job_analysis</code> happened to be slower, extraction ran against an empty skill list and
+                silently produced a thinner profile. No error, no exception, just a quietly worse answer. The fix
+                is the multi-source edge above: <code>["job_analysis", "ingest_documents"] → profile_extraction</code>.
+                LangGraph treats a list source as a barrier, so the node cannot start until both have landed.
+            </p>
+        </div>
+
+        <h2>Inside the subgraphs</h2>
+
+        <h3>Gap analysis — draft, screen, then verify only what is doubtful</h3>
+        <p>
+            A single LLM call asked to grade twenty skills at once is confidently wrong on the borderline ones.
+            Re-verifying all twenty is twenty times the cost for a handful of real corrections. So the subgraph
+            splits the work: one structured-output call drafts every gap, a <em>deterministic</em> screener flags
+            only the borderline items, and a single batched call re-verifies all of the flagged ones together.
+            When nothing is flagged, the verification path is skipped entirely.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart LR
+    A(["START"]) --> B["gap_draft<br/>1 structured LLM call<br/>deterministic fallback on failure"]
+    B --> C["gap_screen<br/>pure Python · flags borderline items"]
+    C -->|"nothing flagged"| F["gap_merge_score<br/>normalise severity → GapScorer"]
+    C -->|"flagged"| D["gap_verify_batch<br/>1 LLM call for ALL flagged items"]
+    D --> E["gap_verify_aggregate<br/>correction stats · observability only"]
+    E --> F
+    F --> G(["END"])
+            </div>
+        </div>
+        <p>
+            The subgraph carries its own <code>GapSubState</code> with private scratchpad fields — the draft, the
+            uncertain items, the corrections. None of them ever surface to the parent <code>PipelineState</code>.
+            LangGraph maps only the overlapping keys across the boundary: <code>job_profile</code> and
+            <code>user_profile</code> in, <code>gap_report</code> and <code>errors</code> out. The parent graph has
+            no idea this node has five steps.
+        </p>
+
+        <h3>Roadmap generation — a dependency graph, and a guard against the LLM's favourite failure</h3>
+        <p>
+            Phases are ordered by prerequisite, not by list position: one LLM call proposes a skill dependency map,
+            pure Python turns it into ordered skeletons, and then <code>Send</code> fans out one generation call per
+            phase. Two branches matter here — a <em>stretch</em> mode when there are no gaps at all (the person
+            already meets the role, so the roadmap deepens existing strengths instead), and a short-circuit when
+            stretch mode finds nothing worth deepening.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart TB
+    S(["START"]) --> RM{"total_gaps == 0 ?"}
+    RM -->|"no — normal mode"| DM["dependency_map_subgraph<br/>1 LLM call → prerequisite DAG"]
+    RM -->|"yes — stretch mode"| SK
+    DM --> SK["skeletons_subgraph<br/>pure Python · zero LLM"]
+
+    SK --> RS{"stretch with<br/>no targets?"}
+    RS -->|"yes"| EM["empty_stretch_roadmap<br/>approved, 0 phases"]
+    RS -->|"no"| FO["fanout_subgraph_B<br/>Send mapper"]
+
+    FO --> G1["generate_one_phase · 1"]
+    FO --> G2["generate_one_phase · 2"]
+    FO --> GN["generate_one_phase · N"]
+
+    G1 --> MG["merge_subgraph<br/>dedupe by skill_id, re-sort by phase_order"]
+    G2 --> MG
+    GN --> MG
+
+    MG --> E(["END"])
+    EM --> E
+            </div>
+        </div>
+        <p>
+            The dependency map has a known failure mode: asked which skills depend on which, a model will happily
+            link everything into one serial chain — A → B → C → D — because the skills co-occur in the job, not
+            because they are genuine prerequisites. That single line collapses an otherwise parallel roadmap into a
+            strictly sequential one and inflates the estimate. So the map is validated before it is trusted, and
+            rejected outright when it degenerates into a single spine with no branching:
+        </p>
+        <pre><code>def _is_total_chain(dependency_map, skill_ids) -> bool:
+    """One path through nearly every skill — a chain, not a DAG."""
+    if len(skill_ids) &lt; 3 or not dependency_map:
+        return False
+    if any(len(prereqs) != 1 for prereqs in dependency_map.values()):
+        return False
+    # A path visits each prerequisite once; a fan-out reuses one.
+    prereqs = [p[0] for p in dependency_map.values()]
+    if len(set(prereqs)) != len(prereqs):
+        return False
+    # One root, every other skill hanging off it.
+    return len(dependency_map) &gt;= len(skill_ids) - 1</code></pre>
+        <p>
+            The distinction it draws is the important part. A genuine fan-out — <code>fastapi</code> and
+            <code>django</code> both requiring <code>python</code> — reuses a prerequisite, and is a legitimate DAG.
+            A chain never reuses one. When the guard fires, the map is dropped and the phases stay independent,
+            which is the safe default rather than the wrong one.
+        </p>
+
+        <h3>Reflect — repair structure first, spend attention second</h3>
+        <p>
+            Validation is staged by cost. A cheap deterministic structural check runs first; if it fails, only the
+            offending phases are regenerated and the check runs again. The expensive LLM critique and the human's
+            attention are never spent on a roadmap that is structurally broken.
+        </p>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart TB
+    S(["START"]) --> RS["reflect_structural<br/>deterministic checks · free"]
+    RS -->|"fail"| TR["targeted_regen<br/>re-generate only faulty_skill_ids"]
+    TR --> RS
+    RS -->|"pass"| RC["reflect_critique<br/>LLM verdict + written critique"]
+    RC --> RH["reflect_human<br/>raises NodeInterrupt"]
+    RH --> E(["END — graph pauses here"])
+
+    RH -.->|"POST /pipeline/:id/resume<br/>aupdate_state as_node=reflect_human"| RES{{"human decision"}}
+    RES -->|"approved"| OUT1["roadmap_approved = True<br/>→ retrieve_phase_resources"]
+    RES -->|"rejected + feedback"| OUT2["retry_count += 1<br/>→ roadmap_generation"]
+            </div>
+        </div>
+        <p>
+            The pause is a conditional interrupt, not a static one. <code>reflect_human</code> raises
+            <code>NodeInterrupt</code> itself when review is needed, carrying the automated critique with it so the
+            reviewer decides with the machine's opinion already in hand. Compiling with
+            <code>interrupt_before=[...]</code> would have been simpler and wrong — it pauses on <em>every</em>
+            pass, including the ones that need no human, and it breaks trace continuity in Langfuse.
+        </p>
+        <p>
+            Resumption goes through the checkpointer. The client POSTs the decision, the service injects it with
+            <code>aupdate_state(as_node="reflect_human")</code>, and the graph continues from exactly where it
+            stopped — same <code>pipeline_id</code>, same thread, same Langfuse trace. Because that state lives in
+            a checkpoint rather than in process memory, a run survives a backend restart mid-review.
+        </p>
+
+        <h2>Retrieval: N parallel branches, then rank-fusion</h2>
+        <p>
+            Once a roadmap is approved, each phase gets its own branch. Inside a branch every retriever fires
+            simultaneously under <code>asyncio.gather</code> — there is no sequential fallback — and each call is
+            wrapped in <code>safe_fetch()</code>, which applies a timeout and swallows the exception into an
+            <code>ok: false</code> flag. One dead API degrades a phase; it never fails a run.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Source</th><th>Role</th><th>RRF weight</th></tr></thead>
+                <tbody>
+                    <tr><td><code>exa_web</code></td><td>Neural web search for articles, docs and courses</td><td>1.5</td></tr>
+                    <tr><td><code>exa_video</code></td><td>Video-scoped search for the same query</td><td>1.4</td></tr>
+                    <tr><td><code>company_rag</code></td><td>The tenant's own Qdrant collection — internal training material</td><td>1.3</td></tr>
+                    <tr><td><code>tavily</code> · <code>youtube</code> · <code>llm</code></td><td>Implemented behind the same <code>ResourceRetriever</code> interface; currently out of the active registry</td><td>1.5 / 1.4 / 0.8</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>
+            Results are fused with Reciprocal Rank Fusion rather than raw scores, because the sources produce
+            incomparable numbers — a cosine similarity and a search rank do not live on the same scale. Two details
+            in the config carry real intent: <code>rrf_k = 10</code> is deliberately small, because per-source lists
+            are short and a large <em>k</em> would let the weights dominate ordering instead of the ranks; and only
+            <code>company_rag</code> has a relevance floor, because its scores are genuine cosine similarities in
+            [0, 1] where 0.4 means off-topic — while a rank-based source's score encodes position, not magnitude,
+            so flooring it would be meaningless. A URL-normalising dedupe collapses the same resource found by two
+            sources, and a per-source cap of 2 stops any single retriever from owning a phase.
+        </p>
+
+        <h2>How one run flows</h2>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+sequenceDiagram
+    autonumber
+    participant B as Browser
+    participant API as FastAPI
+    participant G as LangGraph
+    participant CP as Checkpointer
+    participant LLM as LLM · Groq → Gemini
+    participant R as Retrievers
+    participant DB as Postgres + S3
+
+    B->>API: POST /pipeline/stream
+    API->>API: JWT → CurrentUser{id, company_id, role}
+    API->>G: astream, thread_id = pipeline_id
+    G->>CP: checkpoint after every node
+
+    par three branches from START
+        G->>DB: load_history
+    and
+        G->>LLM: job_analysis
+    and
+        G->>DB: ingest_documents — CV from object storage
+    end
+    G-->>B: node_status events as each lands
+
+    G->>LLM: gap_analysis — draft, screen, batch-verify
+    G->>LLM: roadmap_generation — dependency map + N phase calls
+    G->>G: reflect_structural — repair loop, no LLM
+
+    G->>LLM: reflect_critique
+    G-->>B: NodeInterrupt — roadmap + critique
+    Note over B,CP: graph paused — state lives in the checkpoint<br/>and survives a backend restart
+
+    B->>API: POST /pipeline/{id}/resume {approved, feedback}
+    API->>CP: aupdate_state as_node=reflect_human
+
+    alt rejected
+        CP->>G: retry_count += 1 → roadmap_generation
+    else approved
+        CP->>G: fan out — Send, one per phase
+        loop each phase, in parallel
+            G->>R: all retrievers via asyncio.gather
+            R-->>G: resources + sources_used / sources_failed
+            G-->>B: source pills per phase
+        end
+        G->>G: merge_resources — RRF fusion, dedupe
+        G->>LLM: generate_explanation
+        G->>DB: PDF to object storage
+        G->>DB: store_update — one atomic write
+        G-->>B: run complete
+    end
+            </div>
+        </div>
+
+        <h2>Engineering decisions worth defending</h2>
+
+        <h3>Every node fails softly, by construction</h3>
+        <p>
+            All nodes carry a <code>@pipeline_node(name)</code> decorator. It tracks per-node
+            <code>NodeStatus</code> — which is what the Cockpit timeline renders — and catches exceptions into a
+            <code>NodeError</code> appended to state rather than letting them crash the graph. The
+            <code>errors</code> channel uses an <code>append_errors</code> reducer, so a partial run still reaches
+            <code>store_update</code> and persists what it managed to produce. A run that fails halfway is still a
+            run you can look at.
+        </p>
+
+        <h3>One write path, not fifteen</h3>
+        <p>
+            Nodes accumulate outputs in state; nothing touches the database until <code>store_update</code>.
+            <code>PipelineRunRepo.store_update()</code> persists the target role, gap report, roadmap, resources
+            and explanation report atomically at the end. The alternative — each node writing its own slice — would
+            leave a crashed run as a half-written record that no reader could interpret.
+        </p>
+
+        <h3>The state is the schema</h3>
+        <p>
+            <code>PipelineState</code> is a <code>TypedDict</code> whose concurrency semantics are declared in the
+            type itself. Because branches run in parallel, plain assignment is a lost-update bug waiting to happen,
+            so the channels that multiple branches write to carry explicit reducers:
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Channel</th><th>Reducer</th><th>Why</th></tr></thead>
+                <tbody>
+                    <tr><td><code>errors</code></td><td><code>append_errors</code></td><td>Any node in any branch may fail; all failures must survive.</td></tr>
+                    <tr><td><code>staged_resources</code></td><td><code>append_batches</code></td><td>N parallel phase branches each return one batch.</td></tr>
+                    <tr><td><code>node_statuses</code></td><td><code>merge_node_statuses</code></td><td>Concurrent nodes report status simultaneously; last-write-wins would blank the timeline.</td></tr>
+                    <tr><td><code>phases</code></td><td>annotated list append</td><td>The <code>Send</code> fan-out reduces N phase results into one channel.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h3>Concurrency is capped on purpose</h3>
+        <p>
+            The graph config sets <code>max_concurrency</code> from settings. Without it, a wide fan-out — parallel
+            gap verification plus one retrieval branch per phase — issues a burst of LLM calls that trips the
+            provider's per-minute limit, and the resulting stack of 429 retry-backoffs makes the run slower than if
+            it had never parallelised. Parallelism past the provider's ceiling is negative work.
+        </p>
+
+        <h3>Prompts are versioned artifacts</h3>
+        <p>
+            <code>PromptManager</code> loads <code>.txt</code> templates carrying a front-matter version header,
+            applies <code>str.format()</code>, and caches the rendered string in an LRU dict — with the version as
+            part of the cache key. Editing a template therefore invalidates its cached renders automatically, which
+            removes the entire class of bug where a prompt change appears to do nothing.
+        </p>
+
+        <h3>Model access goes through one factory</h3>
+        <p>
+            Nodes never import a LangChain chat class. <code>LLMFactory</code> is the only place that knows which
+            provider is in play, which is what made two provider-specific problems into one-line fixes rather than
+            ten-file refactors. LangChain's <code>with_structured_output()</code> defaults to
+            <code>json_schema</code>, which Groq's llama models reject outright — so a mixin injects the correct
+            method provider-wide instead of at ten call sites, with an explicit caller argument always winning.
+            The primary model is Groq <code>llama-3.3-70b</code> with a Gemini fallback wired through
+            <code>.with_fallbacks()</code>.
+        </p>
+
+        <h3>Tenant isolation is structural, not a code review habit</h3>
+        <div class="translation">
+            <div class="t-plain">
+                <span class="t-label">The rule</span>
+                <p>
+                    No endpoint accepts <code>company_id</code> from the client — ever. It is read from the JWT,
+                    injected as a dependency, and used as a filter on every tenant-scoped query.
+                </p>
+            </div>
+            <div class="t-tech">
+                <span class="t-label">The mechanism</span>
+                <p>
+                    <code>get_current_user()</code> returns a <code>CurrentUser</code> value object;
+                    <code>require_admin()</code> wraps it and raises 403 on role mismatch. Cross-tenant reads
+                    return <strong>404, not 403</strong> — 403 confirms the resource exists, which is itself a leak.
+                </p>
+            </div>
+        </div>
+        <p>
+            The vector store follows the same rule: one Qdrant collection per company, named
+            <code>company_docs_{company_id}</code>, so a retrieval query cannot cross a tenant boundary even if
+            the filter were wrong — there is nothing to cross into.
+        </p>
+
+        <h2>Fitting a torch-shaped stack into 512 MB</h2>
+        <p>
+            Local development runs twelve containers. Production runs on a free 512 MB / 0.1 CPU instance. Closing
+            that gap was profiling work, and each fix is an environment-variable switch whose default reproduces
+            the Compose behaviour exactly — so <code>docker compose up</code> is untouched.
+        </p>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Switch</th><th>Local</th><th>Production</th><th>What it bought</th></tr></thead>
+                <tbody>
+                    <tr><td><code>DOCUMENT_PARSER_BACKEND</code></td><td><code>docling</code></td><td><code>lite</code></td><td>Docling pulled torch, torchvision, transformers, opencv and scipy — ~1.5 GB installed, and its converter pipeline alone does not fit in 512 MB. <code>lite</code> routes CV parsing through pymupdf + python-docx, the parser the ingestion path already used.</td></tr>
+                    <tr><td><code>LLM_CLIENT</code></td><td><code>litellm</code></td><td><code>openai</code></td><td>litellm costs <strong>148 MB of RSS at import</strong>; langchain-openai costs <strong>13 MB</strong> — measured in the deployed image. With litellm the process sat at 328 MB before serving a request, and loading the embedding model pushed it past the cap into an OOM kill (exit 137). Nothing was lost: the app already spoke to an OpenAI-compatible endpoint.</td></tr>
+                    <tr><td><code>CHECKPOINTER_BACKEND</code></td><td><code>redis</code></td><td><code>postgres</code></td><td>Managed Redis is plain Valkey with no RediSearch module, which <code>AsyncRedisSaver</code> requires.</td></tr>
+                    <tr><td><code>RUN_WORKER_IN_PROCESS</code></td><td><code>false</code></td><td><code>true</code></td><td>No free background-worker instance exists at any price, so ARQ runs inside the web service.</td></tr>
+                    <tr><td><code>WARM_MODELS_ON_STARTUP</code></td><td><code>true</code></td><td><code>false</code></td><td>Eagerly loading fastembed OOMs a cold 512 MB boot before the health check ever answers.</td></tr>
+                </tbody>
+            </table>
+        </div>
+        <p>
+            The import for the chat client is deferred behind an <code>@lru_cache</code>'d resolver so only the
+            selected one is ever loaded — the slim production image installs just one of the two packages. A
+            related bug surfaced in the same pass: three <code>Minio(...)</code> call sites hardcoded
+            <code>secure=False</code>, which works against the local container and fails against every hosted
+            bucket. All six now route through one storage module.
+        </p>
+
+        <h2>Observability</h2>
+        <p>
+            Langfuse auto-instruments every node through the <code>callbacks</code> key in the graph config. Each
+            run is one trace tagged with <code>user_id</code> and <code>pipeline_id</code>, so a trace can be
+            correlated with its database row directly. Because checkpointing keys on <code>pipeline_id</code>,
+            resuming a run continues the same trace rather than starting a second one — nodes that already
+            executed do not reappear. Underneath, structlog emits JSON with a <code>request_id</code> bound per
+            HTTP request by middleware, and the graph exposes <code>GET /topology</code>, which renders its own
+            live structure as a PNG straight from the compiled graph — so the diagram can never drift from the code.
+        </p>
+
+        <h2>Document ingestion</h2>
+        <p>
+            Library uploads are handled off the request path: the file lands in object storage, an ARQ job is
+            enqueued, and the worker downloads, parses, chunks, embeds and upserts. Embeddings are generated
+            <em>locally</em> with fastembed — <code>BAAI/bge-small-en-v1.5</code>, 384 dimensions — which means no
+            per-document API cost and no third party seeing a tenant's internal training material. The worker
+            retries up to three times and marks the row <code>failed</code> on permanent failure, so a stuck
+            document is visible in the admin UI rather than silently absent from search results.
+        </p>
+
+        <h2>API surface</h2>
+        <div class="table-wrap">
+            <table>
+                <thead><tr><th>Endpoint</th><th>Purpose</th></tr></thead>
+                <tbody>
+                    <tr><td><code>POST /pipeline/stream</code></td><td>Run the pipeline, streaming node-level updates as SSE</td></tr>
+                    <tr><td><code>POST /pipeline/{id}/resume</code></td><td>Inject the human roadmap decision and continue from the checkpoint</td></tr>
+                    <tr><td><code>GET /topology</code></td><td>Render the live graph structure as a PNG</td></tr>
+                    <tr><td><code>POST /auth/signup</code> · <code>/login</code> · <code>/invites/{token}/accept</code></td><td>Admin signup creates Company + first Admin atomically; employees join by invite only</td></tr>
+                    <tr><td><code>POST /admin/target-roles</code></td><td>Create a draft role from a JD — runs the <code>job_analysis</code> node standalone</td></tr>
+                    <tr><td><code>POST /admin/target-roles/{id}/assign</code></td><td>Assign a published role to N employees</td></tr>
+                    <tr><td><code>GET /admin/dashboard</code></td><td>Company KPIs — readiness, top gaps, active role counts</td></tr>
+                    <tr><td><code>GET /employee/home</code> · <code>/catalogue</code></td><td>Assigned roles, plus self-service from the published catalogue</td></tr>
+                    <tr><td><code>PATCH /employee/runs/{id}/phases/{index}</code></td><td>Update phase progress; feeds the admin aggregate</td></tr>
+                    <tr><td><code>GET /employee/runs/{id}/report.pdf</code></td><td>Download the explanation report</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <h2>Tech stack</h2>
+        <div class="mermaid-wrap">
+            <div class="mermaid">
+flowchart LR
+    subgraph L1["Interface"]
+        A1["Next.js 14 · TypeScript"]
+        A2["Tailwind · framer-motion"]
+        A3["TanStack Query · Zustand"]
+        A4["EventSource — SSE"]
+    end
+
+    subgraph L2["Service"]
+        B1["FastAPI · Pydantic"]
+        B2["SQLAlchemy async · Alembic"]
+        B3["ARQ worker"]
+        B4["JWT · require_admin"]
+    end
+
+    subgraph L3["Orchestration"]
+        C1["LangGraph — 4 composed graphs"]
+        C2["Send fan-out · barrier joins"]
+        C3["Checkpointer — Redis / Postgres"]
+        C4["NodeInterrupt — HITL gate"]
+    end
+
+    subgraph L4["Data"]
+        D1[("PostgreSQL")]
+        D2[("Qdrant — per-tenant")]
+        D3[("MinIO / S3")]
+        D4[("Redis")]
+    end
+
+    subgraph L5["Models"]
+        E1["Groq llama-3.3-70b — primary"]
+        E2["Gemini — fallback chain"]
+        E3["fastembed bge-small-en-v1.5 · 384d"]
+    end
+
+    subgraph L6["Delivery"]
+        F1["Docker Compose — 12 services"]
+        F2["GitHub Actions · pytest"]
+        F3["Vercel + Render + Neon + Qdrant Cloud"]
+        F4["Langfuse · structlog"]
+    end
+
+    A1 --> B1
+    B1 --> C1
+    C1 --> E1
+    E1 -.->|"fallback"| E2
+    C1 --> D1
+    C1 --> D2
+    B3 --> E3
+    E3 --> D2
+    C1 -.-> F4
+            </div>
+        </div>
+
+        <h2>Limitations</h2>
+        <p>
+            Stated plainly, because a case study that hides them is not worth reading.
+        </p>
+        <ul>
+            <li><strong>No golden-dataset evaluation of gap accuracy yet.</strong> The screening and verification stages measurably reduce borderline errors, but there is no labelled set scoring gap severity against ground truth — which is exactly why this page quotes no accuracy figure.</li>
+            <li><strong>The free-tier demo sleeps.</strong> Instances idle out after fifteen minutes, so the first request after a quiet period pays a cold start.</li>
+            <li><strong>Retrieval quality is bounded by the sources.</strong> Web search returns what it returns; there is no editorial layer scoring whether a course is actually good, only whether it is relevant.</li>
+            <li><strong>English only.</strong> Prompts, parsing and the UI all assume English CVs and job descriptions.</li>
+            <li><strong>Roles are mutually exclusive in v1.</strong> A person is either an admin or an employee within a company, never both. A manager tier with team-scoped visibility is designed but deferred.</li>
+            <li><strong>The human gate is optional in practice.</strong> An employee can approve a roadmap without reading it. The gate guarantees a decision was recorded, not that it was considered.</li>
+        </ul>
+
+        <div class="cta-buttons" style="margin-top: 2.5rem;">
+            <a href="https://frontend-skill-gaps.vercel.app/" target="_blank" rel="noopener" class="btn btn-primary"><i class="fas fa-globe"></i> Try the Live Demo</a>
+            <a href="https://github.com/mounibnasr45/Skills_gap_pfe" target="_blank" rel="noopener" class="btn btn-secondary"><i class="fab fa-github"></i> View on GitHub</a>
+            <a href="../index.html#contact" class="btn btn-secondary"><i class="fas fa-envelope"></i> Get in touch</a>
+        </div>
+    </article>
+
+    <footer class="article-footer">
+        <div class="container">
+            <p>&copy; 2026 Mounib Nasr. All rights reserved.</p>
+            <div class="footer-social">
+                <a href="mailto:mounibnasr123@gmail.com"><i class="fas fa-envelope"></i></a>
+                <a href="https://www.linkedin.com/in/mounib-nasr-073899244/" target="_blank"><i class="fab fa-linkedin"></i></a>
+                <a href="https://github.com/mounibnasr45" target="_blank"><i class="fab fa-github"></i></a>
+                <a href="../Mounib-Nasr-Resume.pdf" target="_blank" rel="noopener" title="Resume (PDF)"><i class="fas fa-file-lines"></i></a>
+            </div>
+        </div>
+    </footer>
+
+    <script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+    <script>
+        mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose" });
+    </script>
+</body>
+</html>
